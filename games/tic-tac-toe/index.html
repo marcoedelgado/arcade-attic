@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tic-Tac-Toe · Arcade Attic</title>
+  <link rel="icon" href="../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <main class="aa-game">
+    <div class="aa-game-top">
+      <a class="aa-back" href="../../">← The Attic</a>
+      <h1 class="aa-game-title">Tic-Tac-Toe</h1>
+    </div>
+
+    <p class="ttt-status" id="status">X to play</p>
+
+    <div class="ttt-board" id="board" role="grid" aria-label="Tic-tac-toe board"></div>
+
+    <div class="ttt-actions">
+      <button class="aa-btn" id="reset" type="button">New game</button>
+    </div>
+  </main>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>

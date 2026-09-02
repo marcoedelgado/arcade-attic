@@ -1,0 +1,255 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ---------- Tokens ---------- */
+:root {
+  --attic:        #17122b;
+  --attic-deep:   #0f0c1e;
+  --panel:        #211a3d;
+  --panel-bright: #2b2350;
+  --edge:         #4a3f7a;
+  --ink:          #f3efff;
+  --ink-dim:      #b3a9d9;
+  --neon:         #ffd34d;
+  --neon-pink:    #ff5d73;
+  --neon-green:   #3ddc97;
+  --neon-blue:    #6fb3ff;
+  --shadow:       3px 3px 0 var(--attic-deep);
+
+  --font-display: 'Press Start 2P', 'Courier New', monospace;
+  --font-body:    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius:       6px;
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 211, 77, 0.12) 0, transparent 55%),
+    var(--attic);
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+a { color: var(--neon-blue); }
+
+.aa-loading { text-align: center; padding: 4rem 1rem; color: var(--ink-dim); font-style: italic; }
+.aa-error   { text-align: center; padding: 2rem 1rem; color: var(--neon-pink); font-style: italic; }
+
+/* ---------- Page container ---------- */
+.aa {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+/* ---------- Marquee header ---------- */
+.aa-marquee {
+  text-align: center;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel-bright) 0%, var(--panel) 100%);
+  box-shadow: var(--shadow);
+  padding: 26px 18px 22px;
+  margin-bottom: 14px;
+  position: relative;
+}
+.aa-marquee::before,
+.aa-marquee::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--neon);
+  box-shadow: 0 0 10px var(--neon);
+  animation: aa-blink 1.4s steps(1) infinite;
+}
+.aa-marquee::before { left: 12px; }
+.aa-marquee::after  { right: 12px; animation-delay: 0.7s; }
+@keyframes aa-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0.25; } }
+
+.aa-title {
+  font-family: var(--font-display);
+  font-size: clamp(20px, 5vw, 34px);
+  line-height: 1.3;
+  margin: 0;
+  color: var(--neon);
+  text-shadow: 0 0 12px rgba(255, 211, 77, 0.45), 3px 3px 0 var(--attic-deep);
+}
+.aa-tagline {
+  margin: 12px 0 0;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* ---------- Section heading ---------- */
+.aa-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 4px 14px;
+  border-bottom: 2px dashed var(--edge);
+  padding-bottom: 6px;
+}
+.aa-bar h2 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  margin: 0;
+  color: var(--ink);
+}
+.aa-count { font-size: 12px; color: var(--ink-dim); }
+
+/* ---------- Game grid ---------- */
+.aa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.aa-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 16px 16px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease;
+}
+.aa-card:hover,
+.aa-card:focus-visible {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--attic-deep);
+  border-color: var(--neon);
+  outline: none;
+}
+.aa-card-emoji {
+  font-size: 40px;
+  line-height: 1;
+}
+.aa-card-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--neon);
+}
+.aa-card-desc {
+  font-size: 13px;
+  color: var(--ink-dim);
+  margin: 0;
+  flex: 1;
+}
+.aa-card-date {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--edge);
+}
+
+/* ---------- Empty state ---------- */
+.aa-empty {
+  text-align: center;
+  padding: 48px 20px;
+  border: 2px dashed var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink-dim);
+}
+.aa-empty-emoji { font-size: 48px; }
+.aa-empty p { margin: 12px 0 0; }
+.aa-empty code {
+  background: var(--attic-deep);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--neon-green);
+}
+
+/* ---------- Footer ---------- */
+.aa-foot {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 2px dashed var(--edge);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.aa-foot a { color: var(--neon-blue); }
+
+/* =========================================================
+   Shared game shell — used by every /games/<slug>/index.html
+   ========================================================= */
+.aa-game {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 20px 64px;
+}
+.aa-game-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.aa-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 12px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.aa-back:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--attic-deep);
+}
+.aa-game-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--neon);
+  margin: 0;
+  text-align: right;
+}
+
+/* Reusable arcade button for use inside games */
+.aa-btn {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--attic-deep);
+  background: var(--neon);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 16px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.aa-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--attic-deep);
+}
+.aa-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--attic-deep);
+}
+
+@media (max-width: 420px) {
+  .aa-game-top { flex-direction: column; align-items: stretch; }
+  .aa-game-title { text-align: center; }
+}

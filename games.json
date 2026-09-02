@@ -1,0 +1,11 @@
+{
+  "games": [
+    {
+      "slug": "tic-tac-toe",
+      "title": "Tic-Tac-Toe",
+      "description": "The classic pen-and-paper duel. Two players, one grid, three in a row to win.",
+      "emoji": "⭕",
+      "added": "2026-09-02"
+    }
+  ]
+}
