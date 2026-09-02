@@ -1,6 +1,6 @@
 # Arcade Attic
 
-Live: <https://marcoedelgado.github.io/arcade-attic/>
+Live: <https://arcade.delgadosanchez.com/>
 
 A growing collection of tiny static browser games — added one small game at a time,
 often from ideas submitted by the kids. Plain HTML/CSS/JS, **no build step, no
@@ -109,10 +109,19 @@ Use them if it helps; ignore them if your game wants its own look.
 ## Deployment (GitHub Pages)
 
 The site deploys straight from the `main` branch — no Actions workflow, no build.
+Every push to `main` publishes within a minute or two. The `.nojekyll` file at the
+repo root tells Pages to serve the files as-is.
 
-**One-time setup** (in the GitHub repo): **Settings → Pages → Build and
-deployment → Source: "Deploy from a branch" → Branch: `main` / `/ (root)`**.
+Served at **<https://arcade.delgadosanchez.com/>** via a custom domain (the
+`CNAME` file at the repo root), mirroring `world-cup-sweepstake`.
 
-After that, every push to `main` publishes to
-<https://marcoedelgado.github.io/arcade-attic/> within a minute or two. The
-`.nojekyll` file at the repo root tells Pages to serve the files as-is.
+**One-time setup:**
+
+1. **DNS** (at the `delgadosanchez.com` registrar / DNS host): add a `CNAME`
+   record — `arcade` → `marcoedelgado.github.io` (same shape as the
+   `worldcup26` record).
+2. **GitHub → repo → Settings → Pages:**
+   - Source: **Deploy from a branch** → Branch: **`main`** / **`/ (root)`**
+   - Custom domain: **`arcade.delgadosanchez.com`** → Save (this reads the
+     committed `CNAME` file; the DNS check goes green once step 1 propagates)
+   - Tick **Enforce HTTPS** once the certificate is issued (can take up to ~15 min)
