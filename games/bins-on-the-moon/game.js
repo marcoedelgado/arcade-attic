@@ -3,6 +3,7 @@ import { buildScene } from './scene.js';
 import { binAtPoint, makeDraggable } from './drag.js';
 
 const PROGRESS_KEY = 'bins-on-the-moon:progress';
+const DRIFT_KEY = 'bins-on-the-moon:drift';
 const root = document.getElementById('game');
 
 let pool = [];               // loaded from items.json
@@ -16,7 +17,8 @@ const state = {
   sorted: 0,
   visible: 0,                // how many items drift at once (set per level)
   reduced: false,            // prefers-reduced-motion — static layout instead of drift
-  fieldToken: 0,             // bumped per level so a stale rAF loop stops
+  drift: true,               // player toggle: are items allowed to move? (set from storage in main)
+  fieldToken: 0,             // bumped per level / per toggle so a stale rAF loop stops
 };
 
 /* ---------- Persistence ---------- */
@@ -37,6 +39,12 @@ function saveProgress(n) {
 function resetProgress() {
   try { localStorage.removeItem(PROGRESS_KEY); } catch {}
 }
+function loadDrift() {
+  try { return localStorage.getItem(DRIFT_KEY) !== 'off'; } catch { return true; }
+}
+function saveDrift(on) {
+  try { localStorage.setItem(DRIFT_KEY, on ? 'on' : 'off'); } catch {}
+}
 
 /* ---------- Title ---------- */
 function showTitle() {
@@ -55,16 +63,26 @@ function showTitle() {
   play.setAttribute('aria-label', 'Play');
   play.addEventListener('click', () => startLevel(loadProgress()));
 
-  const over = document.createElement('button');
-  over.type = 'button';
-  over.className = 'bm-startover';
-  over.textContent = '↺';
-  over.setAttribute('aria-label', 'Start from the beginning');
-  over.addEventListener('click', () => { resetProgress(); startLevel(1); });
-
+  const saved = loadProgress();
   wrap.append(play);
+
+  if (saved > 1) {
+    const resume = document.createElement('p');
+    resume.className = 'bm-resume';
+    resume.textContent = `Resume · Level ${saved}`;
+    wrap.append(resume);
+  }
   root.appendChild(wrap);
-  root.appendChild(over);   // pinned to a scene corner, out of the centered flow (for a parent)
+
+  if (saved > 1) {
+    const over = document.createElement('button');
+    over.type = 'button';
+    over.className = 'bm-startover';
+    over.textContent = '↺';
+    over.setAttribute('aria-label', 'Start from the beginning');
+    over.addEventListener('click', () => { resetProgress(); startLevel(1); });
+    root.appendChild(over);   // pinned to a scene corner, out of the centered flow (for a parent)
+  }
 }
 
 /* ---------- Level ---------- */
@@ -88,11 +106,46 @@ function startLevel(n) {
   scene.setProgress(0, state.total);
 
   for (let i = 0; i < state.visible; i++) spawnNext();
-  if (state.reduced) {
+  if (itemsStatic()) {
     layoutStatic();
   } else {
-    state.fieldToken = (state.fieldToken || 0) + 1;
+    state.fieldToken += 1;
     runField(state.fieldToken);
+  }
+  if (!state.reduced) addDriftToggle();   // OS reduced-motion hides the toggle — that setting wins
+}
+
+// True when items should sit still (OS reduced-motion, or the player turned movement off).
+function itemsStatic() {
+  return state.reduced || !state.drift;
+}
+
+function addDriftToggle() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'bm-drift-toggle';
+  btn.addEventListener('click', () => setDrift(!state.drift));
+  root.appendChild(btn);
+  updateDriftBtn();
+}
+
+function updateDriftBtn() {
+  const btn = root.querySelector('.bm-drift-toggle');
+  if (!btn) return;
+  btn.textContent = state.drift ? '⏸' : '▶';
+  btn.setAttribute('aria-label', state.drift ? 'Stop the items moving' : 'Let the items move');
+}
+
+function setDrift(on) {
+  state.drift = on;
+  saveDrift(on);
+  updateDriftBtn();
+  if (state.phase !== 'playing' || state.reduced) return;
+  state.fieldToken += 1;                // stop the current loop
+  if (on) {
+    runField(state.fieldToken);         // ...and start a fresh one; items keep their headings
+  } else {
+    layoutStatic();                     // settle into a calm row
   }
 }
 
@@ -204,7 +257,7 @@ function runField(token) {
   requestAnimationFrame(step);
 }
 
-// Reduced-motion fallback: a tidy centred, wrapping row — no drifting.
+// A tidy centred, wrapping row — used when items aren't allowed to move.
 function layoutStatic() {
   if (!state.pad.length) return;
   const b = scene.playBounds();
@@ -214,6 +267,7 @@ function layoutStatic() {
   const gap = 16;
   const perRow = Math.max(1, Math.floor((fieldW + gap) / (w + gap)));
   state.pad.forEach((e, i) => {
+    if (e.dragging) return;              // leave an item the player is holding
     const row = Math.floor(i / perRow);
     const rowCount = Math.min(perRow, state.pad.length - row * perRow);
     const rowW = rowCount * w + (rowCount - 1) * gap;
@@ -245,7 +299,7 @@ function spawnNext() {
 
   placeEntry(entry);
   giveVelocity(entry);
-  if (state.reduced) layoutStatic();
+  if (itemsStatic()) layoutStatic();
 
   startIdleTimer();
 }
@@ -256,7 +310,7 @@ function handleDrop(entry, point) {
   if (hit !== null) {
     onWrong(entry, entry.item.bin);             // manages its own idle timer
   } else {
-    if (state.reduced) { entry.el.style.transform = ''; layoutStatic(); entry.dragging = false; }
+    if (itemsStatic()) { entry.el.style.transform = ''; entry.dragging = false; layoutStatic(); }
     else releaseIntoField(entry);
     startIdleTimer();
   }
@@ -327,9 +381,9 @@ function onWrong(entry, correctBinId) {
     if (shakeFallback) clearTimeout(shakeFallback);
     entry.el.removeEventListener('animationend', clearShake);
     entry.el.classList.remove('bm-shake');
-    if (state.reduced) { layoutStatic(); }
-    else { giveVelocity(entry); }
-    entry.dragging = false;       // resume drifting
+    entry.dragging = false;
+    if (itemsStatic()) layoutStatic();
+    else giveVelocity(entry);     // resume drifting on a fresh heading
   };
   entry.el.addEventListener('animationend', clearShake, { once: true });
   shakeFallback = setTimeout(clearShake, 600);   // fallback: `animation: none` never fires animationend
@@ -374,6 +428,7 @@ async function main() {
     root.textContent = 'Could not load the game.';
     return;
   }
+  state.drift = loadDrift();
   showTitle();
 }
 
