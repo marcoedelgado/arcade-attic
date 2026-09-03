@@ -98,3 +98,47 @@
 }
 .ww-slot.is-burnt { animation: ww-shudder 0.3s ease; }
 @keyframes ww-shudder { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* ---------- Counter ---------- */
+.ww-counter {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 14px clamp(10px, 4vw, 22px);
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.ww-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; }
+.ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { width: 64px; height: 64px; }
+.ww-customer-name { font-size: 11px; color: var(--ink-dim); }
+.ww-ticket {
+  flex: 1;
+  background: #f7f0dc; color: #2a231a;
+  border-radius: 4px; padding: 10px 12px;
+  font-size: 13px; line-height: 1.35;
+  box-shadow: var(--shadow);
+  transform: rotate(-1deg);
+}
+.ww-ticket h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7a6a4a; }
+.ww-ticket .ww-ticket-flavour { font-style: italic; color: #6a5c40; margin-top: 6px; display: block; }
+.ww-patience {
+  height: 8px; border-radius: 4px; margin-top: 8px;
+  background: rgba(0,0,0,0.25); overflow: hidden;
+}
+.ww-patience-fill { height: 100%; width: 100%; background: var(--neon-green); transition: width 0.2s linear; }
+.ww-patience-fill.is-low { background: var(--neon-pink); }
+
+/* ---------- Queue ---------- */
+.ww-queue {
+  position: absolute; right: clamp(8px, 3vw, 18px); top: 96px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+}
+.ww-queue-face { font-size: 22px; opacity: 0.55; }
+.ww-queue-face .ww-sprite { width: 28px; height: 28px; }
+
+/* ---------- Toast / flash messages ---------- */
+.ww-say {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  background: rgba(4,2,14,0.82); color: var(--ink);
+  padding: 10px 16px; border-radius: var(--radius); font-size: 14px;
+  max-width: 26ch; text-align: center; pointer-events: none;
+  animation: ww-say 1.6s ease forwards;
+}
+@keyframes ww-say { 0% { opacity: 0; transform: translate(-50%, -40%); } 15%,70% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; } }

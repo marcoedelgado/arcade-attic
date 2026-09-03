@@ -6,7 +6,13 @@ const BEST_KEY = 'waffle-wednesday:best';
 const root = document.getElementById('game');
 
 const content = { crew: [], toppings: [], names: [], lines: {}, donenessVocab: [], syrupChoices: [], roasts: {} };
-const state = { phase: 'title' };
+const state = {
+  phase: 'title',
+  shift: [], index: 0,
+  strikes: 0, score: 0, perfects: 0, served: 0,
+  walkers: [],
+  patienceRaf: 0, patienceStart: 0, patienceMs: 0,
+};
 
 const TOAST = { CARRYOVER: 8, SETTLE_MS: 600 };
 const clampDoneness = (n) => Math.max(0, Math.min(100, n));
@@ -136,6 +142,7 @@ function tick(slot, tPrev) {
 }
 
 function dropWaffle(slot, order, customerId) {
+  cancelAnimationFrame(slot.raf);
   slot.order = order;
   slot.forCustomerId = customerId;
   slot.value = 0;
@@ -160,12 +167,12 @@ function ejectWaffle(slot) {
       const k = Math.min(1, (now - start) / TOAST.SETTLE_MS);
       slot.value = from + (settled - from) * k;
       paintMeter(slot);
-      if (k < 1) { requestAnimationFrame(step); return; }
+      if (k < 1) { slot.raf = requestAnimationFrame(step); return; }
       slot.el.querySelector('.ww-slot-hint').textContent = burnt ? 'burnt!' : 'plated';
       if (burnt) { slot.el.classList.add('is-burnt'); }
       resolve({ settled, burnt });
     };
-    requestAnimationFrame(step);
+    slot.raf = requestAnimationFrame(step);
   });
 }
 
@@ -178,31 +185,193 @@ function resetSlot(slot) {
   slot.el.dataset.empty = 'true';
   slot.el.classList.remove('is-burnt');
   slot.el.querySelector('.ww-slot-hint').textContent = 'tap to toast';
+  slot._settled = null;
+  slot._burnt = null;
 }
 
-/* ---------- Shift (single hardcoded customer — Tasks 8–10 replace this) ---------- */
-const HARDCODED_ORDER = { band: [48, 56], toppings: ['blueberry', 'honey'], syrup: null, meterRate: 16 };
+/* ---------- Ticket + RNG helpers ---------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function donenessWord(target) {
+  for (const v of content.donenessVocab) if (target <= v.max) return v.word;
+  return content.donenessVocab.at(-1).word;
+}
+function toppingLabel(id) {
+  return content.toppings.find((t) => t.id === id)?.label ?? id;
+}
+function syrupWord(syrup) {
+  if (!syrup) return null;
+  const match = content.syrupChoices.find((c) => c.target === syrup.target);
+  return match?.word ?? 'some syrup';
+}
+function ticketText(order) {
+  const centre = (order.band[0] + order.band[1]) / 2;
+  const parts = [`${donenessWord(centre)} waffle`];
+  if (order.toppings.length) parts.push(order.toppings.map(toppingLabel).join(', '));
+  const sw = syrupWord(order.syrup);
+  if (sw) parts.push(sw);
+  return parts.join(' · ');
+}
+
+function say(text) {
+  const el = document.createElement('div');
+  el.className = 'ww-say';
+  el.textContent = text;
+  root.appendChild(el);
+  el.addEventListener('animationend', () => el.remove(), { once: true });
+}
+function pickLine(customer, key) {
+  const pool = (customer.kind === 'crew' && customer.lines?.[key]?.length)
+    ? customer.lines[key]
+    : (content.lines[key] ?? ['…']);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* ---------- Counter + queue ---------- */
+function faceEl(customer, small = false) {
+  if (customer.kind === 'crew') return crewSpriteEl(customer.who, small ? 'ww-sprite' : 'ww-sprite');
+  const span = document.createElement('span');
+  span.className = 'ww-sprite-fallback';
+  span.textContent = ['🧑', '👩', '🧔', '👴', '👱', '🧑‍🦱'][customer.id % 6];
+  return span;
+}
+
+function renderCounter() {
+  root.querySelector('.ww-counter')?.remove();
+  root.querySelector('.ww-queue')?.remove();
+  const cur = state.shift[state.index];
+  if (!cur) return;
+
+  const counter = document.createElement('div');
+  counter.className = 'ww-counter';
+
+  const who = document.createElement('div');
+  who.className = 'ww-customer';
+  who.append(faceEl(cur));
+  const name = document.createElement('div');
+  name.className = 'ww-customer-name';
+  name.textContent = cur.name;
+  who.append(name);
+
+  const ticket = document.createElement('div');
+  ticket.className = 'ww-ticket';
+  ticket.innerHTML = '<h3>Order</h3>';
+  ticket.append(document.createTextNode(ticketText(cur.order)));
+  if (cur.order.ticketText) {
+    const flav = document.createElement('span');
+    flav.className = 'ww-ticket-flavour';
+    flav.textContent = `“${cur.order.ticketText}”`;
+    ticket.append(flav);
+  }
+  const patience = document.createElement('div');
+  patience.className = 'ww-patience';
+  patience.innerHTML = '<div class="ww-patience-fill"></div>';
+  ticket.append(patience);
+
+  counter.append(who, ticket);
+  root.appendChild(counter);
+
+  const queue = document.createElement('div');
+  queue.className = 'ww-queue';
+  for (let i = 1; i <= 3; i++) {
+    const nxt = state.shift[state.index + i];
+    if (!nxt) break;
+    const f = document.createElement('div');
+    f.className = 'ww-queue-face';
+    f.append(faceEl(nxt, true));
+    queue.appendChild(f);
+  }
+  root.appendChild(queue);
+}
+
+function startPatience() {
+  const cur = state.shift[state.index];
+  state.patienceMs = cur.ramp.patience * 1000;
+  state.patienceStart = performance.now();
+  const fill = root.querySelector('.ww-patience-fill');
+  const step = (now) => {
+    const left = Math.max(0, 1 - (now - state.patienceStart) / state.patienceMs);
+    if (fill) {
+      fill.style.width = `${left * 100}%`;
+      fill.classList.toggle('is-low', left < 0.25);
+    }
+    if (left <= 0) { walkout(); return; }
+    state.patienceRaf = requestAnimationFrame(step);
+  };
+  state.patienceRaf = requestAnimationFrame(step);
+}
+function stopPatience() { cancelAnimationFrame(state.patienceRaf); }
+function patienceLeft() {
+  return Math.max(0, 1 - (performance.now() - state.patienceStart) / state.patienceMs);
+}
+
+/* ---------- Shift flow ---------- */
+function walkout() {
+  stopPatience();
+  const cur = state.shift[state.index];
+  state.strikes += 1;
+  state.walkers.push(cur.name);
+  state.score -= 120;
+  say(pickLine(cur, 'walkout'));
+  slots.forEach(resetSlot);
+  setTimeout(() => {
+    if (state.strikes >= 3) endShift('bad');
+    else nextCustomer();
+  }, 1400);
+}
+
+function nextCustomer() {
+  state.index += 1;
+  if (state.index >= 20) { endShift('complete'); return; }
+  slots.forEach(resetSlot);
+  syncSlotCount();
+  renderCounter();
+  startPatience();
+}
+
+function syncSlotCount() {
+  const want = rampFor(state.shift[state.index].id).slots;
+  const toaster = root.querySelector('.ww-toaster');
+  while (slots.length < want) { const s = makeSlot(); slots.push(s); toaster.appendChild(s.el); }
+}
+
+function endShift(kind) {
+  stopPatience();
+  state.phase = kind === 'bad' ? 'bad' : 'complete';
+  console.log(`endShift(${kind})`, { score: state.score, perfects: state.perfects, served: state.served, walkers: state.walkers });
+  // Task 12 renders the report card.
+}
 
 function onSlotClick(slot) {
+  const cur = state.shift[state.index];
   if (slot.el.dataset.empty === 'true') {
-    dropWaffle(slot, HARDCODED_ORDER, 1);
+    dropWaffle(slot, { ...cur.order, meterRate: cur.ramp.meterRate }, cur.id);
   } else if (slot.cooking) {
-    ejectWaffle(slot).then(({ settled, burnt }) => {
-      slot._settled = settled;
-      slot._burnt = burnt;
-    });
+    ejectWaffle(slot).then(({ settled, burnt }) => { slot._settled = settled; slot._burnt = burnt; });
   }
 }
 
 function startShift() {
   state.phase = 'shift';
+  Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [] });
+  state.shift = buildShift(
+    { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
+    mulberry32(Date.now() >>> 0),
+  );
   root.replaceChildren();
 
   const station = document.createElement('div');
   station.className = 'ww-station';
   const toaster = document.createElement('div');
   toaster.className = 'ww-toaster';
-
   slots = [makeSlot()];
   toaster.append(...slots.map((s) => s.el));
 
@@ -210,23 +379,24 @@ function startShift() {
   serve.type = 'button';
   serve.className = 'aa-btn';
   serve.textContent = 'SERVE';
-  serve.addEventListener('click', () => {
-    const slot = slots[0];
-    if (slot._settled == null) return;
-    const r = scoreServe({
-      doneness: slot._settled,
-      band: HARDCODED_ORDER.band,
-      toppings: [], wanted: HARDCODED_ORDER.toppings,
-      syrupLevel: null, wantedSyrup: HARDCODED_ORDER.syrup,
-      patienceLeft: 0.5,
-    });
-    console.log('scoreServe →', r);
-    slot._settled = null;
-    resetSlot(slot);
-  });
-
+  serve.addEventListener('click', onServe);
   station.append(toaster, serve);
   root.appendChild(station);
+
+  renderCounter();
+  startPatience();
+}
+
+function onServe() {
+  // Full scoring lands in Task 10. For now: require a plated waffle, then advance.
+  const slot = slots.find((s) => s.forCustomerId === state.shift[state.index].id && s._settled != null)
+    ?? slots.find((s) => s._settled != null);
+  if (!slot) return;
+  stopPatience();
+  state.served += 1;
+  slot._settled = null;
+  resetSlot(slot);
+  nextCustomer();
 }
 
 /* ---------- Boot ---------- */
