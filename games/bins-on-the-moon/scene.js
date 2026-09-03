@@ -64,6 +64,17 @@ export function buildScene(root, binIds) {
     }));
   }
 
+  // The rectangle (root-local px) that drifting items may roam in: below the
+  // top HUD row, above the bins.
+  function playBounds() {
+    const host = root.getBoundingClientRect();
+    let binTop = host.height;
+    for (const bin of binEls.values()) {
+      binTop = Math.min(binTop, bin.getBoundingClientRect().top - host.top);
+    }
+    return { left: 8, top: 46, right: host.width - 8, bottom: binTop - 6 };
+  }
+
   function setMascot(mood) {
     mascotEl.dataset.mood = mood;
     mascotEl.textContent = mood === 'cheer' || mood === 'jump' ? '🙌' : mood === 'oops' ? '🤷' : '🧑‍🚀';
@@ -152,7 +163,7 @@ export function buildScene(root, binIds) {
 
   return {
     padEl, binEls, mascotEl, progressEl,
-    setProgress, binRects, setMascot, celebrate,
+    setProgress, binRects, playBounds, setMascot, celebrate,
     pulseBin, wiggleBin, arcTo, spawnSparkle, confetti,
   };
 }

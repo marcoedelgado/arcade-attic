@@ -26,11 +26,20 @@
     radial-gradient(1.5px 1.5px at 92% 80%, #fff, transparent);
   opacity: 0.8;
 }
+/* Big moon low on the horizon, behind the play field. */
 .bm-earth {
-  position: absolute; top: 18px; right: 20px;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #6fb3ff, #2f6fd0 60%, #123a7a);
-  box-shadow: 0 0 18px rgba(111, 179, 255, 0.5);
+  position: absolute;
+  left: 50%; bottom: -14%;
+  width: min(92vw, 470px); height: min(92vw, 470px);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(92, 76, 44, 0.30) 0 4.5%, transparent 5.5%),
+    radial-gradient(circle at 63% 22%, rgba(92, 76, 44, 0.22) 0 3%, transparent 4%),
+    radial-gradient(circle at 73% 56%, rgba(92, 76, 44, 0.26) 0 6%, transparent 7%),
+    radial-gradient(circle at 45% 62%, rgba(92, 76, 44, 0.18) 0 3%, transparent 4%),
+    radial-gradient(circle at 38% 40%, #f4e7c6, #e6d3a2 46%, #d0bb84 74%, #b9a26c);
+  box-shadow: 0 0 70px rgba(255, 244, 214, 0.28);
 }
 .bm-ground {
   position: absolute; left: -10%; right: -10%; bottom: -40px;
@@ -45,11 +54,12 @@
 .bm-crater-a { width: 46px; height: 16px; left: 16%; bottom: 44px; }
 .bm-crater-b { width: 30px; height: 12px; right: 24%; bottom: 70px; }
 
-/* ---------- Progress pips ---------- */
+/* ---------- Progress pips (top-right; mascot has the top-left corner) ---------- */
 .bm-progress {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
-  max-width: 80%;
+  position: absolute; top: 10px; right: 10px;
+  display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;
+  max-width: 55%;
+  z-index: 8;
 }
 .bm-pip {
   width: 12px; height: 12px; border-radius: 50%;
@@ -58,34 +68,31 @@
 }
 .bm-pip.is-done { background: var(--neon); border-color: var(--neon); box-shadow: 0 0 8px var(--neon); }
 
-/* ---------- Item pad ---------- */
+/* ---------- Item field ---------- */
+/* Full-bleed layer; items drift inside it, positioned by JS via left/top. */
 .bm-pad {
-  position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%);
-  display: flex; gap: clamp(10px, 4vw, 26px); flex-wrap: wrap;
-  justify-content: center; align-items: center;
-  width: min(88%, 460px);
-}
-@keyframes bm-bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
+  position: absolute; inset: 0;
+  pointer-events: none;
 }
 .bm-item {
-  font-size: clamp(40px, 12vw, 68px);
+  position: absolute; left: 0; top: 0;
+  font-size: clamp(38px, 11vw, 64px);
   line-height: 1;
   background: none; border: 0; padding: 4px; margin: 0;
   cursor: grab;
+  pointer-events: auto;
   touch-action: none;              /* REQUIRED — stops the drag scrolling the page */
-  will-change: transform;
-  transition: transform 0.12s ease;
-  animation: bm-bob 2.4s ease-in-out infinite;
+  will-change: left, top, transform;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));   /* separate from the moon behind */
 }
-.bm-item.dragging { cursor: grabbing; z-index: 20; animation: none; }
+.bm-item.dragging { cursor: grabbing; z-index: 20; }
 
-/* ---------- Mascot ---------- */
+/* ---------- Mascot (top-left corner) ---------- */
 .bm-mascot {
-  position: absolute; left: 10px; bottom: 74px;
-  font-size: clamp(38px, 10vw, 60px);
+  position: absolute; left: 8px; top: 6px;
+  font-size: clamp(34px, 9vw, 52px);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  z-index: 9;
 }
 
 /* ---------- Bins ---------- */
