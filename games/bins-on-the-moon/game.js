@@ -35,6 +35,7 @@ function resetProgress() {
 
 /* ---------- Title ---------- */
 function showTitle() {
+  clearIdleTimer();
   state.phase = 'title';
   root.replaceChildren();
   root.classList.add('bm-scene');
@@ -76,6 +77,23 @@ function startLevel(n) {
   for (let i = 0; i < state.visible; i++) spawnNext();
 }
 
+let idleTimer = null;
+
+function clearIdleTimer() {
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+}
+function startIdleTimer() {
+  clearIdleTimer();
+  idleTimer = setTimeout(() => {
+    const oldest = state.pad[0];
+    if (state.phase === 'playing' && oldest) {
+      scene.pulseBin(oldest.item.bin);
+      scene.arcTo(oldest.item.bin, oldest.el);
+    }
+    startIdleTimer();
+  }, 5000);
+}
+
 function spawnNext() {
   if (state.queue.length === 0) return;
   const item = state.queue.shift();
@@ -89,13 +107,14 @@ function spawnNext() {
 
   const entry = { item, el, drag: null };
   entry.drag = makeDraggable(el, {
-    onGrab: () => { el.style.animationPlayState = 'paused'; },
+    onGrab: () => { el.style.animationPlayState = 'paused'; clearIdleTimer(); },
     onDrop: (point) => handleDrop(entry, point),
-    onReturn: () => { el.style.animationPlayState = ''; },
+    onReturn: () => { el.style.animationPlayState = ''; startIdleTimer(); },
   });
 
   state.pad.push(entry);
   scene.padEl.appendChild(el);
+  startIdleTimer();
 }
 
 function handleDrop(entry, point) {
@@ -108,18 +127,45 @@ function handleDrop(entry, point) {
 
 function onCorrect(entry) {
   entry.drag.destroy();
-  entry.el.remove();
+  clearIdleTimer();
   state.pad = state.pad.filter((e) => e !== entry);
   state.sorted += 1;
-  scene.setProgress(state.sorted, state.total);
-  spawnNext();
-  checkLevelDone();
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const bin = scene.binEls.get(entry.item.bin);
+  const finish = () => {
+    entry.el.remove();
+    scene.setProgress(state.sorted, state.total);
+    scene.wiggleBin(entry.item.bin);
+    scene.spawnSparkle(entry.item.bin);
+    scene.setMascot('cheer');
+    setTimeout(() => scene.setMascot('idle'), 900);
+    spawnNext();
+    checkLevelDone();
+  };
+
+  if (reduce || !bin) { finish(); return; }
+
+  const host = root.getBoundingClientRect();
+  const a = entry.el.getBoundingClientRect();
+  const b = bin.getBoundingClientRect();
+  const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+  const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  entry.el.style.transition = 'transform 0.28s ease-in, opacity 0.28s ease-in';
+  entry.el.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
+  entry.el.style.opacity = '0';
+  entry.el.addEventListener('transitionend', finish, { once: true });
 }
 
 function onWrong(entry, correctBinId) {
-  // Visual feedback (bin pulse, arc, mascot) is added in Task 9.
   scene.setMascot('oops');
   setTimeout(() => scene.setMascot('idle'), 900);
+  scene.pulseBin(correctBinId);
+  scene.arcTo(correctBinId, entry.el);
+  entry.el.classList.remove('bm-shake');
+  void entry.el.offsetWidth;
+  entry.el.classList.add('bm-shake');
+  startIdleTimer();
 }
 
 function checkLevelDone() {
@@ -129,6 +175,7 @@ function checkLevelDone() {
 }
 
 function showLevelComplete() {
+  clearIdleTimer();
   state.phase = 'complete';
   scene.celebrate();
 

@@ -11,6 +11,9 @@ export function buildScene(root, binIds) {
   root.replaceChildren();
   root.classList.add('bm-scene');
 
+  const reduce = typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // Backdrop
   el('div', 'bm-stars', root);
   el('div', 'bm-earth', root);
@@ -66,14 +69,86 @@ export function buildScene(root, binIds) {
     mascotEl.textContent = mood === 'cheer' || mood === 'jump' ? '🙌' : mood === 'oops' ? '🤷' : '🧑‍🚀';
   }
 
-  function celebrate() {
-    setMascot('jump');
-    for (const bin of binEls.values()) {
-      bin.classList.remove('bm-bin-bounce');
-      void bin.offsetWidth;              // restart the animation
-      bin.classList.add('bm-bin-bounce');
+  function restart(node, cls) {
+    node.classList.remove(cls);
+    void node.offsetWidth;
+    node.classList.add(cls);
+    node.addEventListener('animationend', () => node.classList.remove(cls), { once: true });
+  }
+
+  function pulseBin(id) {
+    const bin = binEls.get(id);
+    if (bin) restart(bin, 'bm-bin-pulse');
+  }
+
+  function wiggleBin(id) {
+    const bin = binEls.get(id);
+    if (bin) restart(bin, 'bm-bin-wiggle');
+  }
+
+  function arcTo(id, fromEl) {
+    const bin = binEls.get(id);
+    if (!bin) return;
+    const host = root.getBoundingClientRect();
+    const a = fromEl.getBoundingClientRect();
+    const b = bin.getBoundingClientRect();
+    const x1 = a.left + a.width / 2 - host.left;
+    const y1 = a.top + a.height / 2 - host.top;
+    const x2 = b.left + b.width / 2 - host.left;
+    const y2 = b.top + b.height / 2 - host.top;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'bm-arc');
+    svg.setAttribute('width', String(host.width));
+    svg.setAttribute('height', String(host.height));
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const midX = (x1 + x2) / 2;
+    const midY = Math.min(y1, y2) - 40;
+    path.setAttribute('d', `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`);
+    svg.appendChild(path);
+    root.appendChild(svg);
+    setTimeout(() => svg.remove(), 1600);
+  }
+
+  function spawnSparkle(id) {
+    if (reduce) return;
+    const bin = binEls.get(id);
+    if (!bin) return;
+    const host = root.getBoundingClientRect();
+    const b = bin.getBoundingClientRect();
+    const cx = b.left + b.width / 2 - host.left;
+    const cy = b.top - host.top;
+    for (let i = 0; i < 8; i++) {
+      const s = el('div', 'bm-sparkle', root);
+      const ang = (Math.PI * 2 * i) / 8;
+      s.style.left = `${cx}px`;
+      s.style.top = `${cy}px`;
+      s.style.setProperty('--dx', `${Math.cos(ang) * 40}px`);
+      s.style.setProperty('--dy', `${Math.sin(ang) * 40}px`);
+      s.addEventListener('animationend', () => s.remove(), { once: true });
     }
   }
 
-  return { padEl, binEls, mascotEl, progressEl, setProgress, binRects, setMascot, celebrate };
+  function confetti() {
+    if (reduce) return;
+    for (let i = 0; i < 40; i++) {
+      const c = el('div', 'bm-confetti', root);
+      c.style.left = `${Math.random() * 100}%`;
+      c.style.background = ['#ffd34d', '#ff5d73', '#3ddc97', '#6fb3ff'][i % 4];
+      c.style.animationDelay = `${(Math.random() * 0.5).toFixed(2)}s`;
+      c.addEventListener('animationend', () => c.remove(), { once: true });
+    }
+  }
+
+  function celebrate() {
+    setMascot('jump');
+    confetti();
+    for (const bin of binEls.values()) restart(bin, 'bm-bin-bounce');
+  }
+
+  return {
+    padEl, binEls, mascotEl, progressEl,
+    setProgress, binRects, setMascot, celebrate,
+    pulseBin, wiggleBin, arcTo, spawnSparkle, confetti,
+  };
 }
