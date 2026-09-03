@@ -69,6 +69,19 @@ test('scoreServe: pouring syrup on an order that did not want it penalises', () 
   assert.equal(clean.points - messy.points, 80);
 });
 
+test('scoreServe: syrup overflow is a penalty and breaks perfect', () => {
+  const r = scoreServe({
+    ...base,
+    doneness: 50,
+    toppings: ['a'], wanted: ['a'],
+    syrupLevel: 100, syrupOverflow: true,
+    wantedSyrup: { target: 95, tolerance: 20 },
+  });
+  assert.equal(r.perfect, false);
+  // in-band 100 + topping 30 + syrup overflow -40 = 90
+  assert.equal(r.points, 90);
+});
+
 test('scoreServe: perfect serve adds the +150 bonus and verdict "perfect"', () => {
   const r = scoreServe({
     ...base,
@@ -247,6 +260,29 @@ test('buildShift accepts the real content files', () => {
   const s = buildShift(data, seeded(42));
   assert.equal(s.length, 20);
   assert.equal(new Set(s.filter((c) => c.kind === 'crew').map((c) => c.who)).size, 6);
+});
+
+test('every shipped order is physically servable', () => {
+  const { crew } = readJson('../games/waffle-wednesday/crew.json');
+  const cust = readJson('../games/waffle-wednesday/customers.json');
+  const shift = buildShift(
+    { crew, toppings: cust.toppings, names: cust.names, syrupChoices: cust.syrupChoices },
+    seeded(99),
+  );
+  const CARRYOVER = 8; // must match game.js TOAST.CARRYOVER
+  for (const c of shift) {
+    const [lo, hi] = c.order.band;
+    let servable = 0;
+    for (let d = Math.max(lo, CARRYOVER); d <= hi; d++) {
+      if (!isBurnt(d, c.order.band)) servable++;
+    }
+    assert.ok(servable >= 3, `${c.name} (slot ${c.id}) band ${lo}-${hi}: only ${servable} servable values`);
+    if (c.order.syrup) {
+      const { target, tolerance } = c.order.syrup;
+      assert.ok(target - tolerance <= 100 && target + tolerance >= 0, `${c.name}: unreachable syrup target`);
+    }
+    assert.ok(c.order.toppings.length <= cust.toppings.length, `${c.name}: more toppings than the catalogue has`);
+  }
 });
 
 test('crew-sprites.js: six well-formed 28x28 indexed sprites', async () => {

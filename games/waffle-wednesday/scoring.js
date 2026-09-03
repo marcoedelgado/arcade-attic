@@ -31,6 +31,7 @@ export function scoreServe(input) {
     toppings = [],
     wanted = [],
     syrupLevel = null,
+    syrupOverflow = false,
     wantedSyrup = null,
     patienceLeft = 0,
   } = input;
@@ -73,10 +74,10 @@ export function scoreServe(input) {
   } else {
     syrupOk = poured < T.SYRUP_NEGLIGIBLE;
   }
-  points += syrupOk ? T.SYRUP_OK : T.SYRUP_BAD;
+  points += (syrupOk && !syrupOverflow) ? T.SYRUP_OK : T.SYRUP_BAD;
 
   // --- Perfect ---
-  const perfect = inBand && toppingsOk && syrupOk;
+  const perfect = inBand && toppingsOk && syrupOk && !syrupOverflow;
   if (perfect) points += T.PERFECT_BONUS;
 
   points = Math.round(points);

@@ -241,6 +241,7 @@ function ticketText(order) {
 }
 
 function say(text) {
+  root.querySelector('.ww-say')?.remove();
   const el = document.createElement('div');
   el.className = 'ww-say';
   el.textContent = text;
@@ -321,6 +322,10 @@ function renderCounter() {
     const f = document.createElement('div');
     f.className = 'ww-queue-face';
     f.append(faceEl(nxt, true));
+    const qt = document.createElement('div');
+    qt.className = 'ww-queue-ticket';
+    qt.textContent = ticketText(nxt.order);
+    f.appendChild(qt);
     queue.appendChild(f);
   }
   root.appendChild(queue);
@@ -356,6 +361,7 @@ function walkout() {
   state.score -= 120;
   say(pickLine(cur, 'walkout'));
   slots.forEach(resetSlot);
+  resetPlate();
   state.resolving = false;
   const at = state.index;
   setTimeout(() => {
@@ -375,6 +381,7 @@ function nextCustomer() {
   resetPlate();
   syncSlotCount();
   renderCounter();
+  say(pickLine(state.shift[state.index], 'greet'));
   updateHud();
   startPatience();
   paintPlate();
@@ -410,6 +417,7 @@ function fillRoast(tpl) {
 
 function endShift(kind) {
   stopPatience();
+  resetPlate();
   slots.forEach(resetSlot);
   state.phase = kind === 'bad' ? 'bad' : 'complete';
   state.resolving = false;
@@ -490,6 +498,7 @@ function startShift() {
   root.appendChild(station);
 
   renderCounter();
+  say(pickLine(state.shift[0], 'greet'));
   renderHud();
   startPatience();
   resetPlate();
@@ -545,7 +554,8 @@ function onServe() {
     band: cur.order.band,
     toppings: [...plate.toppings],
     wanted: cur.order.toppings,
-    syrupLevel: plate.syrupOverflow ? 100 : (plate.syrupLevel || null),
+    syrupLevel: plate.syrupLevel || null,
+    syrupOverflow: plate.syrupOverflow,
     wantedSyrup: cur.order.syrup,
     patienceLeft: patienceLeft(),
   });
@@ -614,6 +624,7 @@ function platedSlot() {
 
 function paintPlate() {
   const plateEl = root.querySelector('.ww-plate');
+  if (!plateEl) return;
   const slot = platedSlot();
   plateEl.dataset.empty = slot ? 'false' : 'true';
   if (slot) plateEl.querySelector('.ww-plate-waffle').style.setProperty('--plated-color', slot.waffleEl.style.getPropertyValue('--waffle-color'));

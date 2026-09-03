@@ -129,6 +129,14 @@
 }
 .ww-queue-face { font-size: 22px; opacity: 0.55; }
 .ww-queue-face .ww-sprite { width: 28px; height: 28px; }
+.ww-queue-face .ww-sprite-fallback { font-size: 22px; }
+.ww-queue-ticket {
+  font-size: 9px;
+  line-height: 1.25;
+  max-width: 15ch;
+  text-align: right;
+  color: var(--ink-dim);
+}
 
 /* ---------- Toast / flash messages ---------- */
 .ww-say {
