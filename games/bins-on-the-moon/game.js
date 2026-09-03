@@ -89,8 +89,8 @@ function startIdleTimer() {
     if (state.phase === 'playing' && oldest) {
       scene.pulseBin(oldest.item.bin);
       scene.arcTo(oldest.item.bin, oldest.el);
+      startIdleTimer();
     }
-    startIdleTimer();
   }, 5000);
 }
 
@@ -133,7 +133,13 @@ function onCorrect(entry) {
 
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const bin = scene.binEls.get(entry.item.bin);
+  let done = false;
+  let fallback = null;
   const finish = () => {
+    if (done) return;
+    done = true;
+    if (fallback) { clearTimeout(fallback); fallback = null; }
+    entry.el.removeEventListener('transitionend', finish);
     entry.el.remove();
     scene.setProgress(state.sorted, state.total);
     scene.wiggleBin(entry.item.bin);
@@ -154,7 +160,8 @@ function onCorrect(entry) {
   entry.el.style.transition = 'transform 0.28s ease-in, opacity 0.28s ease-in';
   entry.el.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
   entry.el.style.opacity = '0';
-  entry.el.addEventListener('transitionend', finish, { once: true });
+  entry.el.addEventListener('transitionend', finish);
+  fallback = setTimeout(finish, 450);
 }
 
 function onWrong(entry, correctBinId) {
@@ -175,6 +182,7 @@ function checkLevelDone() {
 }
 
 function showLevelComplete() {
+  if (state.phase === 'complete') return;
   clearIdleTimer();
   state.phase = 'complete';
   scene.celebrate();

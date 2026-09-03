@@ -126,6 +126,7 @@ export function buildScene(root, binIds) {
       s.style.setProperty('--dx', `${Math.cos(ang) * 40}px`);
       s.style.setProperty('--dy', `${Math.sin(ang) * 40}px`);
       s.addEventListener('animationend', () => s.remove(), { once: true });
+      setTimeout(() => s.remove(), 800);
     }
   }
 
@@ -137,6 +138,7 @@ export function buildScene(root, binIds) {
       c.style.background = ['#ffd34d', '#ff5d73', '#3ddc97', '#6fb3ff'][i % 4];
       c.style.animationDelay = `${(Math.random() * 0.5).toFixed(2)}s`;
       c.addEventListener('animationend', () => c.remove(), { once: true });
+      setTimeout(() => c.remove(), 2400);
     }
   }
 
