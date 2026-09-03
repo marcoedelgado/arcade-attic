@@ -156,11 +156,17 @@ function onCorrect(entry) {
 
   if (reduce || !bin) { finish(); return; }
 
-  const host = root.getBoundingClientRect();
+  // The item still carries the drag transform. A CSS `transform` is measured
+  // from the element's original layout box (the pad, centre-screen), so we add
+  // the current translate back in — otherwise the delta is computed from the
+  // dragged position but applied from the origin, and the item slides back to
+  // the middle instead of into the bin.
+  const t = getComputedStyle(entry.el).transform;
+  const m = t && t !== 'none' ? new DOMMatrixReadOnly(t) : new DOMMatrixReadOnly();
   const a = entry.el.getBoundingClientRect();
   const b = bin.getBoundingClientRect();
-  const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
-  const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  const dx = m.m41 + (b.left + b.width / 2) - (a.left + a.width / 2);
+  const dy = m.m42 + (b.top + b.height / 2) - (a.top + a.height / 2);
   entry.el.style.transition = 'transform 0.28s ease-in, opacity 0.28s ease-in';
   entry.el.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
   entry.el.style.opacity = '0';
