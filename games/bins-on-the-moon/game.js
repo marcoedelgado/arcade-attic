@@ -11,9 +11,10 @@ const state = {
   phase: 'title',            // 'title' | 'playing' | 'complete'
   level: 1,
   queue: [],                 // Item[] not yet on the pad
-  pad: [],                   // { item, el }[]
+  pad: [],                   // { item, el, drag }[]
   total: 0,
   sorted: 0,
+  visible: 0,                // how many items sit on the pad at once (set per level)
 };
 
 /* ---------- Persistence ---------- */

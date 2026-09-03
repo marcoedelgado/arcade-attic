@@ -16,11 +16,13 @@ const prefersReducedMotion = () =>
 
 export function makeDraggable(el, { onGrab, onDrop, onReturn } = {}) {
   let dragging = false;
+  let moved = false;
   let startX = 0;
   let startY = 0;
 
   function move(e) {
     if (!dragging) return;
+    moved = true;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     el.style.transform = `translate(${dx}px, ${dy}px) scale(1.15)`;
@@ -37,7 +39,9 @@ export function makeDraggable(el, { onGrab, onDrop, onReturn } = {}) {
     const consumed = onDrop?.({ x: e.clientX, y: e.clientY }) === true;
     if (consumed) return;
 
-    if (prefersReducedMotion()) {
+    // Plain tap (no move) or reduced motion: reset instantly, no transitionend dependency.
+    if (!moved || el.style.transform === '' || prefersReducedMotion()) {
+      el.style.transition = '';
       el.style.transform = '';
       onReturn?.();
       return;
@@ -54,6 +58,7 @@ export function makeDraggable(el, { onGrab, onDrop, onReturn } = {}) {
 
   function down(e) {
     dragging = true;
+    moved = false;
     startX = e.clientX;
     startY = e.clientY;
     try { el.setPointerCapture(e.pointerId); } catch {}

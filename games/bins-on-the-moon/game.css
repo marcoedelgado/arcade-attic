@@ -65,6 +65,10 @@
   justify-content: center; align-items: center;
   width: min(88%, 460px);
 }
+@keyframes bm-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
 .bm-item {
   font-size: clamp(40px, 12vw, 68px);
   line-height: 1;
@@ -73,8 +77,9 @@
   touch-action: none;              /* REQUIRED — stops the drag scrolling the page */
   will-change: transform;
   transition: transform 0.12s ease;
+  animation: bm-bob 2.4s ease-in-out infinite;
 }
-.bm-item.dragging { cursor: grabbing; z-index: 20; }
+.bm-item.dragging { cursor: grabbing; z-index: 20; animation: none; }
 
 /* ---------- Mascot ---------- */
 .bm-mascot {
@@ -111,7 +116,7 @@
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .bm-item { transition: none; }
+  .bm-item { transition: none; animation: none; }
 }
 
 /* ---------- Title screen ---------- */
@@ -137,15 +142,3 @@
   opacity: 0.5;
 }
 .bm-startover:hover { opacity: 1; }
-
-/* ---------- Pad-item bob ---------- */
-@keyframes bm-bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-.bm-item { animation: bm-bob 2.4s ease-in-out infinite; }
-.bm-item.dragging { animation: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  .bm-item { animation: none; }
-}
