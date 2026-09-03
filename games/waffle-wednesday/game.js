@@ -391,7 +391,7 @@ function onSlotClick(slot) {
 
 function startShift() {
   state.phase = 'shift';
-  Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [] });
+  Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [], resolving: false });
   state.shift = buildShift(
     { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
     mulberry32(Date.now() >>> 0),
