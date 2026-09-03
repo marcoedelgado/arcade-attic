@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isBurnt, scoreServe } from '../games/waffle-wednesday/scoring.js';
+import { rampFor, buildShift } from '../games/waffle-wednesday/shift.js';
 
 const base = {
   doneness: 50,
@@ -91,4 +92,103 @@ test('scoreServe: verdict is "good" above the threshold, else "sloppy"', () => {
   assert.equal(good.verdict, 'good');   // 100 + (a +30, b unwanted -25) + 40 = 145; not perfect (toppings off)
   const sloppy = scoreServe({ ...base, doneness: 15, toppings: [], wanted: ['a'] });
   assert.equal(sloppy.verdict, 'sloppy'); // 20 - 25 + 40 = 35
+});
+
+// mulberry32 — deterministic PRNG for tests
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const FIX = {
+  crew: ['marriott', 'pitt', 'nash', 'marco', 'james', 'groves'].map((id) => ({
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    vibe: 'test',
+    order: { band: [45, 55], toppings: ['strawberry'], syrup: null, ticketText: 'the usual' },
+    lines: { greet: ['hi'], happy: ['ta'], walkout: ['bye'] },
+  })),
+  toppings: ['strawberry', 'banana', 'blueberry', 'chocolate', 'honey', 'cream', 'nuts', 'sprinkles'].map((id) => ({ id, emoji: '•' })),
+  names: ['Sam', 'Alex', 'Jo', 'Kai', 'Ree', 'Max', 'Lou', 'Bex', 'Ola', 'Ade'],
+  syrupChoices: [{ target: 50, tolerance: 15 }, { target: 95, tolerance: 20 }],
+};
+
+test('rampFor: clamps and never eases across a boundary', () => {
+  assert.equal(rampFor(0).slots, rampFor(1).slots);
+  assert.equal(rampFor(999).slots, rampFor(20).slots);
+  let prev = rampFor(1);
+  for (let n = 2; n <= 20; n++) {
+    const r = rampFor(n);
+    assert.ok(r.bandWidth <= prev.bandWidth, `band width grew at ${n}`);
+    assert.ok(r.slots >= prev.slots, `slots dropped at ${n}`);
+    assert.ok(r.patience <= prev.patience, `patience grew at ${n}`);
+    assert.ok(r.meterRate >= prev.meterRate, `meter slowed at ${n}`);
+    prev = r;
+  }
+});
+
+test('rampFor: second toaster slot appears at customer 10', () => {
+  assert.equal(rampFor(9).slots, 1);
+  assert.equal(rampFor(10).slots, 2);
+});
+
+test('buildShift: always 20 customers, ids 1..20 in order', () => {
+  const s = buildShift(FIX, seeded(1));
+  assert.equal(s.length, 20);
+  s.forEach((c, i) => assert.equal(c.id, i + 1));
+});
+
+test('buildShift: slots 1 and 2 are always generic', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = buildShift(FIX, seeded(seed));
+    assert.equal(s[0].kind, 'generic');
+    assert.equal(s[1].kind, 'generic');
+  }
+});
+
+test('buildShift: each crew id appears exactly once', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = buildShift(FIX, seeded(seed));
+    const crewIds = s.filter((c) => c.kind === 'crew').map((c) => c.who).sort();
+    assert.deepEqual(crewIds, ['groves', 'james', 'marco', 'marriott', 'nash', 'pitt']);
+  }
+});
+
+test('buildShift: no two adjacent customers are both crew', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = buildShift(FIX, seeded(seed));
+    for (let i = 1; i < s.length; i++) {
+      assert.ok(!(s[i].kind === 'crew' && s[i - 1].kind === 'crew'), `seed ${seed}: adjacent crew at ${i}`);
+    }
+  }
+});
+
+test('buildShift: deterministic for a given rng seed', () => {
+  assert.deepEqual(buildShift(FIX, seeded(7)), buildShift(FIX, seeded(7)));
+});
+
+test('buildShift: crew keep their signature order; ramp still comes from the slot', () => {
+  const s = buildShift(FIX, seeded(3));
+  const groves = s.find((c) => c.who === 'groves');
+  assert.deepEqual(groves.order.band, [45, 55]);          // from the fixture crew order
+  assert.deepEqual(groves.ramp, rampFor(groves.id));      // ramp is the slot's
+});
+
+test('buildShift: generic orders only use catalogue toppings, within the ramp count', () => {
+  const ids = new Set(FIX.toppings.map((t) => t.id));
+  const s = buildShift(FIX, seeded(11));
+  for (const c of s.filter((x) => x.kind === 'generic')) {
+    const [min, max] = c.ramp.toppingCount;
+    assert.ok(c.order.toppings.length >= min && c.order.toppings.length <= max);
+    for (const t of c.order.toppings) assert.ok(ids.has(t), `unknown topping ${t}`);
+    assert.equal(new Set(c.order.toppings).size, c.order.toppings.length, 'duplicate topping');
+    const [lo, hi] = c.order.band;
+    assert.ok(lo >= 0 && hi <= 100 && lo < hi);
+    assert.equal(hi - lo, c.ramp.bandWidth);
+  }
 });
