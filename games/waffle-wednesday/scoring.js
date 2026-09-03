@@ -76,7 +76,7 @@ export function scoreServe(input) {
   points += syrupOk ? T.SYRUP_OK : T.SYRUP_BAD;
 
   // --- Perfect ---
-  const perfect = inBand && toppingsOk && syrupOk && wantedSyrup !== null && wantedSet.size > 0;
+  const perfect = inBand && toppingsOk && syrupOk;
   if (perfect) points += T.PERFECT_BONUS;
 
   points = Math.round(points);
