@@ -66,5 +66,14 @@ export function buildScene(root, binIds) {
     mascotEl.textContent = mood === 'cheer' || mood === 'jump' ? '🙌' : mood === 'oops' ? '🤷' : '🧑‍🚀';
   }
 
-  return { padEl, binEls, mascotEl, progressEl, setProgress, binRects, setMascot };
+  function celebrate() {
+    setMascot('jump');
+    for (const bin of binEls.values()) {
+      bin.classList.remove('bm-bin-bounce');
+      void bin.offsetWidth;              // restart the animation
+      bin.classList.add('bm-bin-bounce');
+    }
+  }
+
+  return { padEl, binEls, mascotEl, progressEl, setProgress, binRects, setMascot, celebrate };
 }

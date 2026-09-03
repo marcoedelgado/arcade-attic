@@ -142,3 +142,27 @@
   opacity: 0.5;
 }
 .bm-startover:hover { opacity: 1; }
+
+/* ---------- Level complete ---------- */
+.bm-complete {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 2, 14, 0.55);
+  backdrop-filter: blur(1px);
+}
+.bm-next {
+  font-size: clamp(44px, 14vw, 80px);
+  line-height: 1;
+  padding: 12px 30px;
+  border-radius: 18px;
+}
+@keyframes bm-bin-bounce {
+  0%, 100% { transform: translateY(0); }
+  30%      { transform: translateY(-14px); }
+  60%      { transform: translateY(0); }
+}
+.bm-bin-bounce { animation: bm-bin-bounce 0.6s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-bin-bounce { animation: none; }
+}

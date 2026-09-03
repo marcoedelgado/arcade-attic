@@ -124,9 +124,29 @@ function onWrong(entry, correctBinId) {
 
 function checkLevelDone() {
   if (state.queue.length === 0 && state.pad.length === 0) {
-    // Level-complete screen is added in Task 8; for now, log.
-    console.log(`level ${state.level} complete`);
+    showLevelComplete();
   }
+}
+
+function showLevelComplete() {
+  state.phase = 'complete';
+  scene.celebrate();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'bm-complete';
+
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'aa-btn bm-next';
+  next.textContent = '→';
+  next.setAttribute('aria-label', 'Next level');
+  next.addEventListener('click', () => {
+    saveProgress(state.level + 1);
+    startLevel(state.level + 1);
+  });
+
+  overlay.appendChild(next);
+  root.appendChild(overlay);
 }
 
 /* ---------- Boot ---------- */
