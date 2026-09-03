@@ -39,6 +39,16 @@ python3 -m http.server 8000
 
 (Any static server works: `npx serve`, VS Code Live Server, etc.)
 
+## Running tests
+
+Some games have a small pure-logic test file under `tests/`. Run them all with
+Node's built-in test runner (Node 20+, no install needed) — it auto-discovers
+the files under `tests/`:
+
+```
+node --test
+```
+
 ## How to add a new game
 
 1. **Pick a slug** — lowercase, hyphenated, e.g. `snake`, `memory-match`.
@@ -85,6 +95,10 @@ python3 -m http.server 8000
    | `description` | one short sentence                                           |
    | `emoji`       | the card "thumbnail" — any emoji                             |
    | `added`       | `YYYY-MM-DD`; the grid sorts newest-first on this            |
+
+   > If your game has sortable/config data (like `bins-on-the-moon/items.json`),
+   > keep it in a JSON file in the game folder — it's safe for non-coders (or the
+   > kids) to edit without touching the game code.
 
 4. **Check it** — run the local server, confirm the card shows up on the home
    page and links through to your game.
