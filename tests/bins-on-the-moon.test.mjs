@@ -104,3 +104,26 @@ test('pickItems: throws when a requested bin has no items (partial pool match)',
   ];
   assert.throws(() => pickItems(poolWithRecyclingOnly, ['recycling', 'food'], 4, seeded(1)));
 });
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const itemsPath = fileURLToPath(new URL('../games/bins-on-the-moon/items.json', import.meta.url));
+
+test('items.json: valid shape and every bin well covered', () => {
+  const data = JSON.parse(readFileSync(itemsPath, 'utf8'));
+  assert.ok(Array.isArray(data.items) && data.items.length >= 24);
+
+  const perBin = Object.fromEntries(BIN_IDS.map((id) => [id, 0]));
+  for (const it of data.items) {
+    assert.equal(typeof it.emoji, 'string');
+    assert.ok(it.emoji.length > 0);
+    assert.equal(typeof it.name, 'string');
+    assert.ok(it.name.trim().length > 0);
+    assert.ok(BIN_IDS.includes(it.bin), `bad bin: ${it.bin}`);
+    perBin[it.bin]++;
+  }
+  for (const id of BIN_IDS) {
+    assert.ok(perBin[id] >= 6, `bin ${id} has only ${perBin[id]} items (need >= 6)`);
+  }
+});
