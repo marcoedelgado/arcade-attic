@@ -1,6 +1,13 @@
 {
   "games": [
     {
+      "slug": "waffle-wednesday",
+      "title": "Waffle Wednesday",
+      "description": "Toast it right, top it faster. One shift, twenty customers, three walkouts and it's a bad Wednesday.",
+      "emoji": "🧇",
+      "added": "2026-09-03"
+    },
+    {
       "slug": "bins-on-the-moon",
       "title": "Bins on the Moon",
       "description": "Sort the space rubbish into the right bin — a tidy-up game for little astronauts.",
