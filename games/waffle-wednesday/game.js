@@ -379,9 +379,9 @@ function nextCustomer() {
     if (s.forCustomerId != null && s.forCustomerId < state.shift[state.index].id) resetSlot(s);
   }
   resetPlate();
-  syncSlotCount();
   renderCounter();
   say(pickLine(state.shift[state.index], 'greet'));
+  syncSlotCount();
   updateHud();
   startPatience();
   paintPlate();
