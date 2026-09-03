@@ -248,3 +248,20 @@ test('buildShift accepts the real content files', () => {
   assert.equal(s.length, 20);
   assert.equal(new Set(s.filter((c) => c.kind === 'crew').map((c) => c.who)).size, 6);
 });
+
+test('crew-sprites.js: six well-formed 28x28 indexed sprites', async () => {
+  const { CREW_SPRITES } = await import('../games/waffle-wednesday/crew-sprites.js');
+  const ids = Object.keys(CREW_SPRITES).sort();
+  assert.deepEqual(ids, ['groves', 'james', 'marco', 'marriott', 'nash', 'pitt']);
+  for (const [id, sp] of Object.entries(CREW_SPRITES)) {
+    assert.equal(sp.w, 28, `${id} width`);
+    assert.equal(sp.h, 28, `${id} height`);
+    assert.ok(sp.palette.length >= 2 && sp.palette.length <= 16, `${id} palette size`);
+    assert.ok(sp.palette.every((c) => /^#[0-9a-f]{6}$/i.test(c)), `${id} palette hex`);
+    assert.equal(sp.pixels.length, 28 * 28, `${id} pixel count`);
+    assert.ok(/^[0-9a-f]+$/i.test(sp.pixels), `${id} pixel chars`);
+    for (const ch of sp.pixels) {
+      assert.ok(parseInt(ch, 16) < sp.palette.length, `${id} index out of range`);
+    }
+  }
+});
