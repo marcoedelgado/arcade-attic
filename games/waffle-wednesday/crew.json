@@ -1,0 +1,112 @@
+{
+  "crew": [
+    {
+      "id": "marriott",
+      "name": "Marriott",
+      "vibe": "Everyone's punchbag. Lowest-stakes order in the game.",
+      "order": {
+        "band": [42, 62],
+        "toppings": ["banana"],
+        "syrup": null,
+        "ticketText": "Whatever's easiest. Yes, I'm still paying."
+      },
+      "lines": {
+        "greet": ["Go easy on me.", "The usual disappointment, please."],
+        "happy": ["That's... actually fine?", "I'll take the win."],
+        "meh": ["Sounds about right for me.", "Par for the course."],
+        "angry": ["Even the waffle's against me.", "Of course. Of course it is."],
+        "walkout": ["Story of my life.", "I'll just... not eat then."]
+      }
+    },
+    {
+      "id": "pitt",
+      "name": "Pitt",
+      "vibe": "Wants it pale. Fussy about any browning whatsoever.",
+      "order": {
+        "band": [20, 34],
+        "toppings": ["honey"],
+        "syrup": null,
+        "ticketText": "Pale. I said PALE. Barely toasted."
+      },
+      "lines": {
+        "greet": ["Keep it light. Lighter than that.", "No colour. None."],
+        "happy": ["Now THAT is a pale waffle.", "Flawless. Barely cooked."],
+        "meh": ["Bit dark round the edges.", "I can see grill marks. Concerning."],
+        "angry": ["This is BROWN. I asked for pale.", "Are you trying to upset me?"],
+        "walkout": ["I'll toast my own at home. Correctly.", "Unbelievable."]
+      }
+    },
+    {
+      "id": "nash",
+      "name": "Nash",
+      "vibe": "Hyper-precise. Narrowest doneness band in the game. Tuts.",
+      "order": {
+        "band": [48, 56],
+        "toppings": ["blueberry", "honey"],
+        "syrup": null,
+        "ticketText": "Golden. Actual golden. Two toppings, no more."
+      },
+      "lines": {
+        "greet": ["I've modelled the optimal waffle. Match it.", "Precision, please."],
+        "happy": ["Within tolerance. Excellent.", "The data is satisfied."],
+        "meh": ["Marginal. I'll allow it.", "Outside one sigma but inside two."],
+        "angry": ["That is nowhere near the target.", "*tuts audibly*"],
+        "walkout": ["I'm logging this.", "The spreadsheet will remember."]
+      }
+    },
+    {
+      "id": "marco",
+      "name": "Marco",
+      "vibe": "Orders in invented words you decode from context.",
+      "order": {
+        "band": [40, 60],
+        "toppings": ["strawberry", "cream"],
+        "syrup": { "target": 50, "tolerance": 15 },
+        "ticketText": "Un waffito, not too oscuro, con las fresas y the white fluffy. Medium syrupation."
+      },
+      "lines": {
+        "greet": ["Hazme el desayuno, pero make it pretty.", "You know what I want. Probably."],
+        "happy": ["Perfectamente. Chef's beso.", "This is a waffle of the highest calidad."],
+        "meh": ["Está... okay-ish. Regular tirando a meh.", "Not your obra maestra."],
+        "angry": ["Esto no es lo que dije! I clearly said fresas!", "Disaster. Un desastre total."],
+        "walkout": ["Me voy. With great disappointment.", "I take my business elsewhere, amigo."]
+      }
+    },
+    {
+      "id": "james",
+      "name": "James",
+      "vibe": "Kid at heart. Wants absurd amounts of everything.",
+      "order": {
+        "band": [45, 70],
+        "toppings": ["strawberry", "chocolate", "sprinkles", "cream"],
+        "syrup": { "target": 95, "tolerance": 20 },
+        "ticketText": "Everything. All of it. Then more syrup. Then a cherry I didn't ask about."
+      },
+      "lines": {
+        "greet": ["Load it up. LOAD IT.", "Can you fit more on? Try."],
+        "happy": ["YES. This is a birthday every day.", "Absolute unit of a waffle."],
+        "meh": ["Could be taller.", "Where's the rest of the sprinkles?"],
+        "angry": ["That's a SENSIBLE waffle. I hate it.", "Not nearly enough chocolate."],
+        "walkout": ["I'll go somewhere fun.", "Boo. BOO."]
+      }
+    },
+    {
+      "id": "groves",
+      "name": "Groves",
+      "vibe": "Shows up rough. Wants it burnt. Hardest regular.",
+      "order": {
+        "band": [82, 95],
+        "toppings": ["bacon", "chocolate", "banana"],
+        "syrup": { "target": 95, "tolerance": 20 },
+        "ticketText": "Cremate it. Bacon, chocolate, banana — don't ask. Drown it in syrup."
+      },
+      "lines": {
+        "greet": ["Big night. Make it hurt.", "Burn it. More than that."],
+        "happy": ["Now THAT'S a hangover killer.", "You beautiful, reckless cook."],
+        "meh": ["Needs to be darker. And greasier.", "I've had worse. Recently."],
+        "angry": ["This is barely toasted. I asked for CHARCOAL.", "Where's my bacon??"],
+        "walkout": ["I'm going back to bed.", "Nah. I'll suffer at home."]
+      }
+    }
+  ]
+}

@@ -2,6 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isBurnt, scoreServe } from '../games/waffle-wednesday/scoring.js';
 import { rampFor, buildShift } from '../games/waffle-wednesday/shift.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const readJson = (rel) =>
+  JSON.parse(readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8'));
 
 const base = {
   doneness: 50,
@@ -191,4 +196,55 @@ test('buildShift: generic orders only use catalogue toppings, within the ramp co
     assert.ok(lo >= 0 && hi <= 100 && lo < hi);
     assert.equal(hi - lo, c.ramp.bandWidth);
   }
+});
+
+test('customers.json: valid catalogue, names, vocab', () => {
+  const c = readJson('../games/waffle-wednesday/customers.json');
+  assert.ok(Array.isArray(c.toppings) && c.toppings.length >= 6);
+  const ids = new Set();
+  for (const t of c.toppings) {
+    assert.equal(typeof t.id, 'string');
+    assert.ok(t.emoji.length > 0);
+    assert.ok(t.label.length > 0);
+    assert.ok(!ids.has(t.id), `duplicate topping id ${t.id}`);
+    ids.add(t.id);
+  }
+  assert.ok(c.names.length >= 8);
+  for (const k of ['greet', 'happy', 'meh', 'angry', 'walkout']) {
+    assert.ok(Array.isArray(c.lines[k]) && c.lines[k].length >= 2, `lines.${k}`);
+  }
+  assert.ok(c.donenessVocab.at(-1).max >= 100);
+  assert.ok(c.syrupChoices.length >= 2);
+  for (const r of ['chefsKiss', 'solid', 'rough', 'badWednesday']) {
+    assert.ok(Array.isArray(c.roasts[r]) && c.roasts[r].length >= 1, `roasts.${r}`);
+  }
+});
+
+test('crew.json: the six regulars with well-formed signature orders', () => {
+  const { crew } = readJson('../games/waffle-wednesday/crew.json');
+  const catalogue = new Set(readJson('../games/waffle-wednesday/customers.json').toppings.map((t) => t.id));
+  const ids = crew.map((m) => m.id).sort();
+  assert.deepEqual(ids, ['groves', 'james', 'marco', 'marriott', 'nash', 'pitt']);
+  for (const m of crew) {
+    const [lo, hi] = m.order.band;
+    assert.ok(lo >= 0 && hi <= 100 && lo < hi, `${m.id} band`);
+    for (const t of m.order.toppings) assert.ok(catalogue.has(t), `${m.id}: unknown topping ${t}`);
+    if (m.order.syrup) {
+      assert.equal(typeof m.order.syrup.target, 'number');
+      assert.equal(typeof m.order.syrup.tolerance, 'number');
+    }
+    assert.ok(m.order.ticketText.length > 0, `${m.id} ticketText`);
+    for (const k of ['greet', 'happy', 'walkout']) {
+      assert.ok(Array.isArray(m.lines[k]) && m.lines[k].length >= 1, `${m.id}.lines.${k}`);
+    }
+  }
+});
+
+test('buildShift accepts the real content files', () => {
+  const { crew } = readJson('../games/waffle-wednesday/crew.json');
+  const cust = readJson('../games/waffle-wednesday/customers.json');
+  const data = { crew, toppings: cust.toppings, names: cust.names, syrupChoices: cust.syrupChoices };
+  const s = buildShift(data, seeded(42));
+  assert.equal(s.length, 20);
+  assert.equal(new Set(s.filter((c) => c.kind === 'crew').map((c) => c.who)).size, 6);
 });

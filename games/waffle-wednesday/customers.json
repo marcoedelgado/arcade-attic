@@ -1,0 +1,83 @@
+{
+  "toppings": [
+    { "id": "strawberry", "emoji": "🍓", "label": "strawberries" },
+    { "id": "banana", "emoji": "🍌", "label": "banana" },
+    { "id": "blueberry", "emoji": "🫐", "label": "blueberries" },
+    { "id": "chocolate", "emoji": "🍫", "label": "chocolate chips" },
+    { "id": "nuts", "emoji": "🥜", "label": "crushed nuts" },
+    { "id": "cream", "emoji": "🍦", "label": "squirty cream" },
+    { "id": "honey", "emoji": "🍯", "label": "honey drizzle" },
+    { "id": "sprinkles", "emoji": "✨", "label": "sprinkles" },
+    { "id": "cherry", "emoji": "🍒", "label": "a cherry on top" },
+    { "id": "bacon", "emoji": "🥓", "label": "bacon" }
+  ],
+  "names": [
+    "Sam", "Alex", "Jo", "Priya", "Kai", "Danny", "Ola", "Bex",
+    "Tom", "Ruth", "Marcus", "Lena", "Fitz", "Nadia", "Coop", "Wes"
+  ],
+  "lines": {
+    "greet": [
+      "Morning. Waffle. Go.",
+      "Same as always, cheers.",
+      "Surprise me. Actually don't.",
+      "I've got four minutes.",
+      "Make it a good one."
+    ],
+    "happy": [
+      "Oh that's the stuff.",
+      "Perfect, genuinely.",
+      "You've done it again.",
+      "Worth the wait."
+    ],
+    "meh": [
+      "It'll do.",
+      "Bit off but I'm hungry.",
+      "Not your best.",
+      "Hmm. Fine."
+    ],
+    "angry": [
+      "That's not what I asked for.",
+      "Did you even read the ticket?",
+      "I'm not paying full price for this.",
+      "Waffle crimes."
+    ],
+    "walkout": [
+      "Forget it, I'm going to Greggs.",
+      "Life's too short. Bye.",
+      "I waited long enough.",
+      "Right, that's me done."
+    ]
+  },
+  "donenessVocab": [
+    { "max": 18, "word": "raw" },
+    { "max": 34, "word": "pale" },
+    { "max": 48, "word": "just golden" },
+    { "max": 62, "word": "golden" },
+    { "max": 76, "word": "well done" },
+    { "max": 90, "word": "dark" },
+    { "max": 101, "word": "practically charcoal" }
+  ],
+  "syrupChoices": [
+    { "target": 25, "tolerance": 12, "word": "a trickle" },
+    { "target": 50, "tolerance": 15, "word": "half a bottle" },
+    { "target": 95, "tolerance": 20, "word": "drown it" }
+  ],
+  "roasts": {
+    "chefsKiss": [
+      "{who} declares it the best Wednesday on record. Chef's kiss.",
+      "{who}: 'I have no notes. Terrifying.'"
+    ],
+    "solid": [
+      "{who} nods slowly. 'Respectable shift. Nobody cried.'",
+      "{who}: 'Solid. Not legendary. Solid.'"
+    ],
+    "rough": [
+      "{who} winces. 'We've all had worse Wednesdays. Barely.'",
+      "{who}: 'The waffles were fine. The vibes were not.'"
+    ],
+    "badWednesday": [
+      "{who} reads out the names of the fallen: {walkers}. Never forget.",
+      "{who}: '{walkers} walked. On a Wednesday. Shameful.'"
+    ]
+  }
+}
