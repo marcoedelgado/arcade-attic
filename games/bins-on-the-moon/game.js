@@ -1,5 +1,6 @@
 import { levelConfig, pickItems, BIN_IDS } from './levels.js';
 import { buildScene } from './scene.js';
+import { binAtPoint, makeDraggable } from './drag.js';
 
 const PROGRESS_KEY = 'bins-on-the-moon:progress';
 const root = document.getElementById('game');
@@ -70,7 +71,61 @@ function startLevel(n) {
 
   scene = buildScene(root, cfg.bins);
   scene.setProgress(0, state.total);
-  // Item spawning + drag wiring arrive in Task 7.
+  state.visible = cfg.visible;
+  for (let i = 0; i < state.visible; i++) spawnNext();
+}
+
+function spawnNext() {
+  if (state.queue.length === 0) return;
+  const item = state.queue.shift();
+
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'bm-item';
+  el.textContent = item.emoji;
+  el.setAttribute('aria-label', item.name);
+  el.style.animationDelay = `${(state.pad.length * 0.4).toFixed(2)}s`;
+
+  const entry = { item, el, drag: null };
+  entry.drag = makeDraggable(el, {
+    onGrab: () => { el.style.animationPlayState = 'paused'; },
+    onDrop: (point) => handleDrop(entry, point),
+    onReturn: () => { el.style.animationPlayState = ''; },
+  });
+
+  state.pad.push(entry);
+  scene.padEl.appendChild(el);
+}
+
+function handleDrop(entry, point) {
+  const hit = binAtPoint(point, scene.binRects());
+  if (hit === null) return false;               // dropped on no bin → snap back, no penalty
+  if (hit === entry.item.bin) { onCorrect(entry); return true; }
+  onWrong(entry, entry.item.bin);
+  return false;                                  // wrong bin → snap back
+}
+
+function onCorrect(entry) {
+  entry.drag.destroy();
+  entry.el.remove();
+  state.pad = state.pad.filter((e) => e !== entry);
+  state.sorted += 1;
+  scene.setProgress(state.sorted, state.total);
+  spawnNext();
+  checkLevelDone();
+}
+
+function onWrong(entry, correctBinId) {
+  // Visual feedback (bin pulse, arc, mascot) is added in Task 9.
+  scene.setMascot('oops');
+  setTimeout(() => scene.setMascot('idle'), 900);
+}
+
+function checkLevelDone() {
+  if (state.queue.length === 0 && state.pad.length === 0) {
+    // Level-complete screen is added in Task 8; for now, log.
+    console.log(`level ${state.level} complete`);
+  }
 }
 
 /* ---------- Boot ---------- */

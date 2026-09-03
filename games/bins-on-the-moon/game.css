@@ -137,3 +137,15 @@
   opacity: 0.5;
 }
 .bm-startover:hover { opacity: 1; }
+
+/* ---------- Pad-item bob ---------- */
+@keyframes bm-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.bm-item { animation: bm-bob 2.4s ease-in-out infinite; }
+.bm-item.dragging { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-item { animation: none; }
+}
