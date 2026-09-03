@@ -12,6 +12,7 @@ const state = {
   strikes: 0, score: 0, perfects: 0, served: 0,
   walkers: [],
   patienceRaf: 0, patienceStart: 0, patienceMs: 0,
+  resolving: false,
 };
 
 const TOAST = { CARRYOVER: 8, SETTLE_MS: 600 };
@@ -330,6 +331,7 @@ function walkout() {
   state.score -= 120;
   say(pickLine(cur, 'walkout'));
   slots.forEach(resetSlot);
+  state.resolving = false;
   const at = state.index;
   setTimeout(() => {
     if (state.index !== at) return;   // a serve already advanced us
@@ -340,8 +342,11 @@ function walkout() {
 
 function nextCustomer() {
   state.index += 1;
+  state.resolving = false;
   if (state.index >= 20) { endShift('complete'); return; }
-  slots.forEach(resetSlot);
+  for (const s of slots) {
+    if (s.forCustomerId != null && s.forCustomerId < state.shift[state.index].id) resetSlot(s);
+  }
   resetPlate();
   syncSlotCount();
   renderCounter();
@@ -352,9 +357,16 @@ function nextCustomer() {
 }
 
 function syncSlotCount() {
-  const want = rampFor(state.shift[state.index].id).slots;
+  const want = state.shift[state.index].ramp.slots;
   const toaster = root.querySelector('.ww-toaster');
-  while (slots.length < want) { const s = makeSlot(); slots.push(s); toaster.appendChild(s.el); }
+  while (slots.length < want) {
+    const s = makeSlot();
+    s.el.classList.add('ww-slot-new');
+    s.el.addEventListener('animationend', () => s.el.classList.remove('ww-slot-new'), { once: true });
+    slots.push(s);
+    toaster.appendChild(s.el);
+    say('Second toaster — you can pre-toast for the queue now.');
+  }
 }
 
 function endShift(kind) {
@@ -365,9 +377,13 @@ function endShift(kind) {
 }
 
 function onSlotClick(slot) {
-  const cur = state.shift[state.index];
   if (slot.el.dataset.empty === 'true') {
-    dropWaffle(slot, { ...cur.order, meterRate: cur.ramp.meterRate }, cur.id);
+    const frontId = state.shift[state.index].id;
+    const frontBusy = slots.some((s) => s.forCustomerId === frontId && (s.cooking || s._settled != null));
+    const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
+    if (!target) return;
+    dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
+    slot.el.querySelector('.ww-slot-hint').textContent = target.id === frontId ? 'tap to eject' : `for ${target.name}`;
   } else if (slot.cooking) {
     ejectWaffle(slot).then(({ settled, burnt }) => { slot._settled = settled; slot._burnt = burnt; });
   }
@@ -434,11 +450,13 @@ function flash(verdict) {
 }
 
 function onServe() {
+  if (state.resolving) return;
   const cur = state.shift[state.index];
   const slot = slots.find((s) => s.forCustomerId === cur.id && s._settled != null)
     ?? slots.find((s) => s._settled != null);
   if (!slot) { say('Toast something first.'); return; }
 
+  state.resolving = true;
   stopPatience();
 
   const result = scoreServe({

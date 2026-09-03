@@ -98,6 +98,8 @@
 }
 .ww-slot.is-burnt { animation: ww-shudder 0.3s ease; }
 @keyframes ww-shudder { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.ww-slot-new { animation: ww-slot-in 0.4s ease; }
+@keyframes ww-slot-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ---------- Counter ---------- */
 .ww-counter {
