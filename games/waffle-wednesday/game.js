@@ -369,11 +369,59 @@ function syncSlotCount() {
   }
 }
 
+function ratingFor(score, kind) {
+  if (kind === 'bad') return { key: 'badWednesday', title: 'Bad Wednesday' };
+  if (score >= 3200) return { key: 'chefsKiss', title: "Chef's kiss" };
+  if (score >= 1800) return { key: 'solid', title: 'Solid Wednesday' };
+  return { key: 'rough', title: 'Rough Wednesday' };
+}
+
+function fillRoast(tpl) {
+  const name = content.crew[Math.floor(Math.random() * content.crew.length)].name;
+  return tpl
+    .replaceAll('{who}', name)
+    .replaceAll('{walkers}', state.walkers.join(', ') || 'nobody');
+}
+
 function endShift(kind) {
   stopPatience();
+  slots.forEach(resetSlot);
   state.phase = kind === 'bad' ? 'bad' : 'complete';
-  console.log(`endShift(${kind})`, { score: state.score, perfects: state.perfects, served: state.served, walkers: state.walkers });
-  // Task 12 renders the report card.
+  state.resolving = false;
+
+  const rating = ratingFor(state.score, kind);
+  saveBest({ score: state.score, rating: rating.title, perfects: state.perfects, served: state.served });
+
+  const pool = content.roasts[rating.key] ?? content.roasts.rough;
+  const roast = fillRoast(pool[Math.floor(Math.random() * pool.length)]);
+
+  root.replaceChildren();
+  const card = document.createElement('div');
+  card.className = 'ww-report';
+  card.innerHTML = `
+    <h2>${rating.title}</h2>
+    <div class="ww-report-score">${state.score.toLocaleString()}</div>
+    <p class="ww-report-roast">${roast}</p>
+    <div class="ww-report-stats">
+      <div><b>${state.perfects}</b> perfect</div>
+      <div><b>${state.served}</b> served</div>
+      <div><b>${state.strikes}</b> walked</div>
+    </div>`;
+
+  const actions = document.createElement('div');
+  actions.className = 'ww-report-actions';
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'aa-btn ww-report-new';
+  again.textContent = 'New shift';
+  again.addEventListener('click', () => startShift());
+  const home = document.createElement('a');
+  home.className = 'aa-btn';
+  home.href = '../../';
+  home.textContent = '← The Attic';
+  actions.append(again, home);
+  card.appendChild(actions);
+  root.appendChild(card);
 }
 
 function onSlotClick(slot) {
