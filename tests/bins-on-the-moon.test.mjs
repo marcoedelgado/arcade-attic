@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BINS, BIN_IDS, levelConfig, pickItems } from '../games/bins-on-the-moon/levels.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { binAtPoint } from '../games/bins-on-the-moon/drag.js';
 
 test('BINS has the four bins in fixed order', () => {
   assert.deepEqual(BIN_IDS, ['recycling', 'food', 'general', 'junk']);
@@ -105,9 +108,6 @@ test('pickItems: throws when a requested bin has no items (partial pool match)',
   assert.throws(() => pickItems(poolWithRecyclingOnly, ['recycling', 'food'], 4, seeded(1)));
 });
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 const itemsPath = fileURLToPath(new URL('../games/bins-on-the-moon/items.json', import.meta.url));
 
 test('items.json: valid shape and every bin well covered', () => {
@@ -126,4 +126,23 @@ test('items.json: valid shape and every bin well covered', () => {
   for (const id of BIN_IDS) {
     assert.ok(perBin[id] >= 6, `bin ${id} has only ${perBin[id]} items (need >= 6)`);
   }
+});
+
+const TARGETS = [
+  { id: 'recycling', rect: { left: 0,   top: 0, right: 100, bottom: 100 } },
+  { id: 'food',      rect: { left: 120, top: 0, right: 220, bottom: 100 } },
+];
+
+test('binAtPoint: point inside a target returns its id', () => {
+  assert.equal(binAtPoint({ x: 50, y: 50 }, TARGETS), 'recycling');
+  assert.equal(binAtPoint({ x: 150, y: 10 }, TARGETS), 'food');
+});
+
+test('binAtPoint: edges are inclusive', () => {
+  assert.equal(binAtPoint({ x: 100, y: 100 }, TARGETS), 'recycling');
+});
+
+test('binAtPoint: point outside every target returns null', () => {
+  assert.equal(binAtPoint({ x: 110, y: 50 }, TARGETS), null);
+  assert.equal(binAtPoint({ x: 500, y: 500 }, TARGETS), null);
 });
