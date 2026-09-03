@@ -322,7 +322,9 @@ function walkout() {
   state.score -= 120;
   say(pickLine(cur, 'walkout'));
   slots.forEach(resetSlot);
+  const at = state.index;
   setTimeout(() => {
+    if (state.index !== at) return;   // a serve already advanced us
     if (state.strikes >= 3) endShift('bad');
     else nextCustomer();
   }, 1400);
