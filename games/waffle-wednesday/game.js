@@ -25,6 +25,7 @@ let pourRaf = 0;
 function resetPlate() {
   plate = { toppings: new Set(), syrupLevel: 0, syrupOverflow: false };
   cancelAnimationFrame(pourRaf);
+  pourRaf = 0;
 }
 
 /* ---------- Persistence ---------- */
@@ -398,6 +399,7 @@ function startShift() {
 
   renderCounter();
   startPatience();
+  resetPlate();
   paintPlate();
   syncChips();
 }
@@ -518,6 +520,7 @@ function makeChipDraggable(chip, plateEl) {
 }
 
 function pourStart() {
+  cancelAnimationFrame(pourRaf);
   if (!platedSlot() || plate.syrupOverflow) return;
   let prev = performance.now();
   const step = (now) => {
@@ -529,7 +532,7 @@ function pourStart() {
   };
   pourRaf = requestAnimationFrame(step);
 }
-function pourStop() { cancelAnimationFrame(pourRaf); }
+function pourStop() { cancelAnimationFrame(pourRaf); pourRaf = 0; }
 
 /* ---------- Boot ---------- */
 async function main() {
