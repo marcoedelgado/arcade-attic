@@ -20,6 +20,13 @@ const settle = (raw) => clampDoneness(raw + TOAST.CARRYOVER);
 
 let slots = [];   // Slot[]
 
+let plate = { toppings: new Set(), syrupLevel: 0, syrupOverflow: false };
+let pourRaf = 0;
+function resetPlate() {
+  plate = { toppings: new Set(), syrupLevel: 0, syrupOverflow: false };
+  cancelAnimationFrame(pourRaf);
+}
+
 /* ---------- Persistence ---------- */
 function loadBest() {
   try {
@@ -334,9 +341,12 @@ function nextCustomer() {
   state.index += 1;
   if (state.index >= 20) { endShift('complete'); return; }
   slots.forEach(resetSlot);
+  resetPlate();
   syncSlotCount();
   renderCounter();
   startPatience();
+  paintPlate();
+  syncChips();
 }
 
 function syncSlotCount() {
@@ -383,10 +393,13 @@ function startShift() {
   serve.textContent = 'SERVE';
   serve.addEventListener('click', onServe);
   station.append(toaster, serve);
+  renderStationExtras(station);
   root.appendChild(station);
 
   renderCounter();
   startPatience();
+  paintPlate();
+  syncChips();
 }
 
 function onServe() {
@@ -400,6 +413,123 @@ function onServe() {
   resetSlot(slot);
   nextCustomer();
 }
+
+/* ---------- Plating ---------- */
+function renderStationExtras(station) {
+  const area = document.createElement('div');
+  area.className = 'ww-plate-area';
+
+  const plateEl = document.createElement('div');
+  plateEl.className = 'ww-plate';
+  plateEl.dataset.empty = 'true';
+  plateEl.innerHTML = '<div class="ww-plate-waffle"></div>';
+
+  const syrup = document.createElement('div');
+  syrup.className = 'ww-syrup';
+  syrup.innerHTML = '🍯<div class="ww-syrup-gauge"><div class="ww-syrup-gauge-fill"></div></div>';
+  syrup.addEventListener('pointerdown', (e) => { e.preventDefault(); pourStart(); });
+  syrup.addEventListener('pointerup', pourStop);
+  syrup.addEventListener('pointercancel', pourStop);
+  syrup.addEventListener('pointerleave', pourStop);
+
+  area.append(syrup, plateEl);
+
+  const shelf = document.createElement('div');
+  shelf.className = 'ww-shelf';
+  for (const t of content.toppings) {
+    const chip = document.createElement('div');
+    chip.className = 'ww-chip';
+    chip.textContent = t.emoji;
+    chip.dataset.topping = t.id;
+    chip.title = t.label;
+    makeChipDraggable(chip, plateEl);
+    shelf.appendChild(chip);
+  }
+
+  station.append(area, shelf);
+}
+
+function platedSlot() {
+  return slots.find((s) => s._settled != null && !s._burnt);
+}
+
+function paintPlate() {
+  const plateEl = root.querySelector('.ww-plate');
+  const slot = platedSlot();
+  plateEl.dataset.empty = slot ? 'false' : 'true';
+  if (slot) plateEl.querySelector('.ww-plate-waffle').style.setProperty('--plated-color', slot.waffleEl.style.getPropertyValue('--waffle-color'));
+
+  const waffle = plateEl.querySelector('.ww-plate-waffle');
+  waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
+  let i = 0;
+  for (const id of plate.toppings) {
+    const dot = document.createElement('span');
+    dot.className = 'ww-plate-topping';
+    dot.textContent = content.toppings.find((t) => t.id === id)?.emoji ?? '';
+    dot.style.left = `${30 + (i % 3) * 20}%`;
+    dot.style.top = `${30 + Math.floor(i / 3) * 22}%`;
+    dot.addEventListener('click', () => { plate.toppings.delete(id); syncChips(); paintPlate(); });
+    waffle.appendChild(dot);
+    i++;
+  }
+  root.querySelector('.ww-syrup-gauge-fill').style.width = `${plate.syrupLevel}%`;
+  plateEl.classList.toggle('is-overflow', plate.syrupOverflow);
+}
+
+function syncChips() {
+  root.querySelectorAll('.ww-chip').forEach((c) => {
+    c.classList.toggle('is-on', plate.toppings.has(c.dataset.topping));
+  });
+}
+
+function makeChipDraggable(chip, plateEl) {
+  chip.addEventListener('pointerdown', (e) => {
+    if (!platedSlot()) return;
+    const ghost = chip.cloneNode(true);
+    ghost.style.position = 'fixed';
+    ghost.style.left = `${e.clientX}px`;
+    ghost.style.top = `${e.clientY}px`;
+    ghost.style.transform = 'translate(-50%, -50%)';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.zIndex = '50';
+    document.body.appendChild(ghost);
+    chip.classList.add('dragging');
+    try { chip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+
+    const move = (ev) => { ghost.style.left = `${ev.clientX}px`; ghost.style.top = `${ev.clientY}px`; };
+    const up = (ev) => {
+      chip.removeEventListener('pointermove', move);
+      chip.removeEventListener('pointerup', up);
+      chip.removeEventListener('pointercancel', up);
+      chip.classList.remove('dragging');
+      ghost.remove();
+      const r = plateEl.getBoundingClientRect();
+      const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+      if (inside && platedSlot()) {
+        plate.toppings.add(chip.dataset.topping);
+        syncChips();
+        paintPlate();
+      }
+    };
+    chip.addEventListener('pointermove', move);
+    chip.addEventListener('pointerup', up);
+    chip.addEventListener('pointercancel', up);
+  });
+}
+
+function pourStart() {
+  if (!platedSlot() || plate.syrupOverflow) return;
+  let prev = performance.now();
+  const step = (now) => {
+    plate.syrupLevel = Math.min(100, plate.syrupLevel + 60 * ((now - prev) / 1000));
+    prev = now;
+    paintPlate();
+    if (plate.syrupLevel >= 100) { plate.syrupOverflow = true; paintPlate(); return; }
+    pourRaf = requestAnimationFrame(step);
+  };
+  pourRaf = requestAnimationFrame(step);
+}
+function pourStop() { cancelAnimationFrame(pourRaf); }
 
 /* ---------- Boot ---------- */
 async function main() {

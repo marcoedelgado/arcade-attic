@@ -142,3 +142,41 @@
   animation: ww-say 1.6s ease forwards;
 }
 @keyframes ww-say { 0% { opacity: 0; transform: translate(-50%, -40%); } 15%,70% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; } }
+
+/* ---------- Plating ---------- */
+.ww-plate-area { display: flex; align-items: center; gap: 12px; justify-content: center; }
+.ww-plate {
+  position: relative;
+  width: clamp(90px, 26vw, 120px); aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #fff, #d7d2e4 70%, #b3a9d9);
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+}
+.ww-plate[data-empty="true"] { opacity: 0.4; }
+.ww-plate-waffle {
+  width: 66%; aspect-ratio: 1; border-radius: 8px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
+    var(--plated-color, #e8c98f);
+  position: relative;
+}
+.ww-plate-topping { position: absolute; font-size: 18px; transform: translate(-50%, -50%); cursor: pointer; }
+.ww-plate.is-overflow { animation: ww-shudder 0.3s ease; box-shadow: 0 0 0 4px var(--neon-pink); }
+
+.ww-shelf { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.ww-chip {
+  font-size: 22px; line-height: 1;
+  background: var(--panel-bright); border: 2px solid var(--edge); border-radius: var(--radius);
+  padding: 6px 8px; cursor: grab; touch-action: none;
+}
+.ww-chip.dragging { opacity: 0.6; }
+.ww-chip.is-on { border-color: var(--neon-green); }
+
+.ww-syrup {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 26px; cursor: pointer; touch-action: none; user-select: none;
+}
+.ww-syrup-gauge { width: 46px; height: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); overflow: hidden; }
+.ww-syrup-gauge-fill { height: 100%; width: 0%; background: #b5651d; }
