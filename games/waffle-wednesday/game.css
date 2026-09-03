@@ -43,11 +43,6 @@
 .ww-sprite { image-rendering: pixelated; border-radius: 4px; }
 .ww-sprite-fallback { font-size: 40px; line-height: 1; }
 
-/* ---------- Reduced motion ---------- */
-@media (prefers-reduced-motion: reduce) {
-  .ww * { animation: none !important; transition: none !important; }
-}
-
 /* ---------- Station / toaster ---------- */
 .ww-station {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -219,3 +214,33 @@
 .ww-report-actions { display: flex; gap: 10px; }
 .ww-report-actions a { text-decoration: none; }
 .ww-report-new { color: var(--attic-deep); }
+
+/* ---------- Steam ---------- */
+.ww-steam {
+  position: absolute; top: 6px; left: 50%; width: 8px; height: 8px;
+  border-radius: 50%; background: rgba(255,255,255,0.5);
+  animation: ww-steam 1.4s ease-in-out infinite;
+}
+@keyframes ww-steam {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  40% { opacity: 0.6; }
+  100% { transform: translate(-50%, -26px) scale(1.3); opacity: 0; }
+}
+
+/* ---------- Customer bob ---------- */
+.ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { animation: ww-bob 3s ease-in-out infinite; }
+@keyframes ww-bob { 50% { transform: translateY(-4px); } }
+
+/* ---------- Confetti ---------- */
+.ww-confetti { position: absolute; top: -12px; width: 8px; height: 12px; will-change: transform; }
+@keyframes ww-fall { to { transform: translateY(680px) rotate(540deg); opacity: 0.2; } }
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ww-steam, .ww-confetti { display: none; }
+  .ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { animation: none; }
+  .ww.flash-perfect, .ww.flash-good, .ww.flash-sloppy, .ww.flash-burnt { animation: none; }
+  .ww-slot-new { animation: none; }
+  .ww-say { animation: none; opacity: 1; }
+  /* meter marker / waffle colour still update — they are the mechanic */
+}

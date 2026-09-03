@@ -5,6 +5,9 @@ import { rampFor, buildShift } from './shift.js';
 const BEST_KEY = 'waffle-wednesday:best';
 const root = document.getElementById('game');
 
+const reduceMotion = () =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const content = { crew: [], toppings: [], names: [], lines: {}, donenessVocab: [], syrupChoices: [], roasts: {} };
 const state = {
   phase: 'title',
@@ -158,6 +161,11 @@ function dropWaffle(slot, order, customerId) {
   slot.rate = order.meterRate ?? rampFor(customerId ?? 1).meterRate;
   slot.cooking = true;
   slot.el.dataset.empty = 'false';
+  if (!reduceMotion() && !slot.el.querySelector('.ww-steam')) {
+    const steam = document.createElement('div');
+    steam.className = 'ww-steam';
+    slot.el.appendChild(steam);
+  }
   slot.el.querySelector('.ww-slot-hint').textContent = 'tap to eject';
   paintMeter(slot);
   slot.raf = requestAnimationFrame(tick(slot, performance.now()));
@@ -166,6 +174,7 @@ function dropWaffle(slot, order, customerId) {
 function ejectWaffle(slot) {
   slot.cooking = false;
   cancelAnimationFrame(slot.raf);
+  slot.el.querySelector('.ww-steam')?.remove();
   const settled = settle(slot.value);
   const burnt = isBurnt(settled, slot.order.band);
   // animate marker from current value to settled over SETTLE_MS
@@ -188,6 +197,7 @@ function ejectWaffle(slot) {
 function resetSlot(slot) {
   slot.cooking = false;
   cancelAnimationFrame(slot.raf);
+  slot.el.querySelector('.ww-steam')?.remove();
   slot.value = 0;
   slot.order = null;
   slot.forCustomerId = null;
@@ -235,7 +245,22 @@ function say(text) {
   el.className = 'ww-say';
   el.textContent = text;
   root.appendChild(el);
-  el.addEventListener('animationend', () => el.remove(), { once: true });
+  if (reduceMotion()) setTimeout(() => el.remove(), 1600);
+  else el.addEventListener('animationend', () => el.remove(), { once: true });
+}
+
+function confetti() {
+  if (reduceMotion()) return;
+  const colors = ['#ffd34d', '#ff5d73', '#3ddc97', '#6fb3ff'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'ww-confetti';
+    p.style.left = `${Math.random() * 100}%`;
+    p.style.background = colors[i % colors.length];
+    p.style.animation = `ww-fall ${1 + Math.random()}s ease-in ${Math.random() * 0.3}s forwards`;
+    root.appendChild(p);
+    p.addEventListener('animationend', () => p.remove(), { once: true });
+  }
 }
 function pickLine(customer, key) {
   const pool = (customer.kind === 'crew' && customer.lines?.[key]?.length)
@@ -422,6 +447,8 @@ function endShift(kind) {
   actions.append(again, home);
   card.appendChild(actions);
   root.appendChild(card);
+
+  if (rating.key === 'chefsKiss') confetti();
 }
 
 function onSlotClick(slot) {
@@ -494,7 +521,12 @@ function flash(verdict) {
   root.classList.remove('flash-perfect', 'flash-good', 'flash-sloppy', 'flash-burnt');
   void root.offsetWidth;
   root.classList.add(cls);
-  root.addEventListener('animationend', () => root.classList.remove(cls), { once: true });
+  const done = (e) => {
+    if (e.target !== root) return;
+    root.classList.remove(cls);
+    root.removeEventListener('animationend', done);
+  };
+  root.addEventListener('animationend', done);
 }
 
 function onServe() {
