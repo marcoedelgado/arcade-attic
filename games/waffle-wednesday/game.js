@@ -345,6 +345,7 @@ function nextCustomer() {
   resetPlate();
   syncSlotCount();
   renderCounter();
+  updateHud();
   startPatience();
   paintPlate();
   syncChips();
@@ -398,22 +399,79 @@ function startShift() {
   root.appendChild(station);
 
   renderCounter();
+  renderHud();
   startPatience();
   resetPlate();
   paintPlate();
   syncChips();
 }
 
+function renderHud() {
+  root.querySelector('.ww-hud')?.remove();
+  const hud = document.createElement('div');
+  hud.className = 'ww-hud';
+  hud.innerHTML = `
+    <span class="ww-hud-cust"></span>
+    <span class="ww-hud-score"></span>
+    <span class="ww-strikes"><span></span><span></span><span></span></span>`;
+  root.appendChild(hud);
+  updateHud();
+}
+function updateHud() {
+  const hud = root.querySelector('.ww-hud');
+  if (!hud) return;
+  hud.querySelector('.ww-hud-cust').textContent = `Cust ${Math.min(state.index + 1, 20)}/20`;
+  hud.querySelector('.ww-hud-score').textContent = `${state.score.toLocaleString()}`;
+  hud.querySelectorAll('.ww-strikes span').forEach((s, i) => s.classList.toggle('is-lit', i < state.strikes));
+}
+
+function flash(verdict) {
+  const cls = `flash-${verdict}`;
+  root.classList.remove('flash-perfect', 'flash-good', 'flash-sloppy', 'flash-burnt');
+  void root.offsetWidth;
+  root.classList.add(cls);
+  root.addEventListener('animationend', () => root.classList.remove(cls), { once: true });
+}
+
 function onServe() {
-  // Full scoring lands in Task 10. For now: require a plated waffle, then advance.
-  const slot = slots.find((s) => s.forCustomerId === state.shift[state.index].id && s._settled != null)
+  const cur = state.shift[state.index];
+  const slot = slots.find((s) => s.forCustomerId === cur.id && s._settled != null)
     ?? slots.find((s) => s._settled != null);
-  if (!slot) return;
+  if (!slot) { say('Toast something first.'); return; }
+
   stopPatience();
+
+  const result = scoreServe({
+    doneness: slot._settled,
+    band: cur.order.band,
+    toppings: [...plate.toppings],
+    wanted: cur.order.toppings,
+    syrupLevel: plate.syrupOverflow ? 100 : (plate.syrupLevel || null),
+    wantedSyrup: cur.order.syrup,
+    patienceLeft: patienceLeft(),
+  });
+
+  state.score += result.points + result.tip;
+  if (result.perfect) state.perfects += 1;
   state.served += 1;
+
+  flash(result.verdict);
+  const lineKey = result.verdict === 'perfect' ? 'happy'
+    : result.verdict === 'good' ? 'happy'
+    : result.verdict === 'sloppy' ? 'meh'
+    : 'angry';
+  say(pickLine(cur, lineKey));
+
   slot._settled = null;
   resetSlot(slot);
-  nextCustomer();
+  resetPlate();
+  updateHud();
+
+  const at = state.index;
+  setTimeout(() => {
+    if (state.index !== at) return;
+    nextCustomer();
+  }, 900);
 }
 
 /* ---------- Plating ---------- */
