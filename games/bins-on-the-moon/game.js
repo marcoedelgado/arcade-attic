@@ -51,7 +51,6 @@ function showTitle() {
   clearIdleTimer();
   state.phase = 'title';
   root.replaceChildren();
-  root.classList.add('bm-scene');
 
   const wrap = document.createElement('div');
   wrap.className = 'bm-title';

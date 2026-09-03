@@ -9,7 +9,6 @@ function el(tag, className, parent) {
 
 export function buildScene(root, binIds) {
   root.replaceChildren();
-  root.classList.add('bm-scene');
 
   const reduce = typeof matchMedia === 'function'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
