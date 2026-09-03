@@ -1,4 +1,4 @@
-import { levelConfig, pickItems, BIN_IDS } from './levels.js';
+import { levelConfig, pickItems } from './levels.js';
 import { buildScene } from './scene.js';
 import { binAtPoint, makeDraggable } from './drag.js';
 
@@ -27,7 +27,10 @@ function loadProgress() {
   }
 }
 function saveProgress(n) {
-  try { localStorage.setItem(PROGRESS_KEY, String(Math.max(1, Math.floor(n)))); } catch {}
+  try {
+    const next = Math.max(loadProgress(), Math.max(1, Math.floor(n)));
+    localStorage.setItem(PROGRESS_KEY, String(next));
+  } catch {}
 }
 function resetProgress() {
   try { localStorage.removeItem(PROGRESS_KEY); } catch {}
@@ -57,8 +60,9 @@ function showTitle() {
   over.setAttribute('aria-label', 'Start from the beginning');
   over.addEventListener('click', () => { resetProgress(); startLevel(1); });
 
-  wrap.append(play, over);
+  wrap.append(play);
   root.appendChild(wrap);
+  root.appendChild(over);   // pinned to a scene corner, out of the centered flow (for a parent)
 }
 
 /* ---------- Level ---------- */
@@ -103,7 +107,7 @@ function spawnNext() {
   el.className = 'bm-item';
   el.textContent = item.emoji;
   el.setAttribute('aria-label', item.name);
-  el.style.animationDelay = `${(state.pad.length * 0.4).toFixed(2)}s`;
+  el.style.animationDelay = `-${(state.pad.length * 0.4).toFixed(2)}s`;
 
   const entry = { item, el, drag: null };
   entry.drag = makeDraggable(el, {
@@ -172,6 +176,17 @@ function onWrong(entry, correctBinId) {
   entry.el.classList.remove('bm-shake');
   void entry.el.offsetWidth;
   entry.el.classList.add('bm-shake');
+  let shakeCleared = false;
+  let shakeFallback = null;
+  const clearShake = () => {
+    if (shakeCleared) return;
+    shakeCleared = true;
+    if (shakeFallback) clearTimeout(shakeFallback);
+    entry.el.removeEventListener('animationend', clearShake);
+    entry.el.classList.remove('bm-shake');
+  };
+  entry.el.addEventListener('animationend', clearShake, { once: true });
+  shakeFallback = setTimeout(clearShake, 600);   // fallback: `animation: none` never fires animationend
   startIdleTimer();
 }
 

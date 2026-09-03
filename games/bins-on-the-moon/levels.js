@@ -49,10 +49,13 @@ export function pickItems(pool, binIds, count, rng = Math.random) {
     if (result.length >= count) break;
     result.push(pickFrom(available.filter((it) => it.bin === id)));
   }
-  // 2. Fill the rest — prefer items not yet used.
+  // 2. Fill the rest — prefer items not yet used; once every distinct item is used,
+  //    fall back to any active item, just avoiding an immediate repeat of the last push.
+  //    (Step 3's shuffle may still place equal items adjacent — no back-to-back guarantee.)
   while (result.length < count) {
     const unused = available.filter((it) => !result.includes(it));
-    const pool2 = unused.length ? unused : available;
+    let pool2 = unused.length ? unused : available.filter((it) => it !== result[result.length - 1]);
+    if (pool2.length === 0) pool2 = available;      // pool of 1: nothing else to pick
     result.push(pickFrom(pool2));
   }
   // 3. Fisher-Yates shuffle so the guaranteed picks aren't front-loaded.

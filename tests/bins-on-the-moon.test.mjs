@@ -7,7 +7,9 @@ import { binAtPoint } from '../games/bins-on-the-moon/drag.js';
 
 test('BINS has the four bins in fixed order', () => {
   assert.deepEqual(BIN_IDS, ['recycling', 'food', 'general', 'junk']);
+  assert.deepEqual(BINS.map((b) => b.id), ['recycling', 'food', 'general', 'junk']);
   for (const b of BINS) {
+    assert.equal(typeof b.id, 'string');
     assert.equal(typeof b.color, 'string');
     assert.ok(b.icon.length > 0);
     assert.ok(b.label.length > 0);
@@ -94,6 +96,19 @@ test('pickItems: deterministic for a given rng seed', () => {
   const a = pickItems(POOL, ['recycling', 'food', 'general'], 6, seeded(7));
   const b = pickItems(POOL, ['recycling', 'food', 'general'], 6, seeded(7));
   assert.deepEqual(a, b);
+});
+
+test('pickItems: count exceeding the distinct pool still returns exactly count valid items', () => {
+  const tinyPool = [
+    { emoji: 'r', name: 'r0', bin: 'recycling' },
+    { emoji: 'r', name: 'r1', bin: 'recycling' },
+  ];
+  const picks = pickItems(tinyPool, ['recycling'], 6, seeded(1));
+  assert.equal(picks.length, 6);                         // count 6 > distinct pool 2: repeats allowed
+  assert.ok(picks.every((it) => it.bin === 'recycling'));
+  for (const it of tinyPool) {
+    assert.ok(picks.includes(it), `${it.name} never appeared`);
+  }
 });
 
 test('pickItems: throws when the pool has nothing for the bins', () => {

@@ -73,7 +73,9 @@ export function buildScene(root, binIds) {
     node.classList.remove(cls);
     void node.offsetWidth;
     node.classList.add(cls);
-    node.addEventListener('animationend', () => node.classList.remove(cls), { once: true });
+    const clear = () => node.classList.remove(cls);
+    node.addEventListener('animationend', clear, { once: true });
+    setTimeout(clear, 1200);           // fallback: animationend won't fire under `animation: none`
   }
 
   function pulseBin(id) {

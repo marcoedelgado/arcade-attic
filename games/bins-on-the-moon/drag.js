@@ -48,12 +48,18 @@ export function makeDraggable(el, { onGrab, onDrop, onReturn } = {}) {
     }
     el.style.transition = 'transform 0.3s ease';
     el.style.transform = '';
+    let finished = false;
+    let fallback = null;
     const done = () => {
+      if (finished) return;
+      finished = true;
+      if (fallback) clearTimeout(fallback);
       el.style.transition = '';
       el.removeEventListener('transitionend', done);
       onReturn?.();
     };
     el.addEventListener('transitionend', done);
+    fallback = setTimeout(done, 400);   // fallback: transitionend can be suppressed (e.g. by a prior transform animation)
   }
 
   function down(e) {
