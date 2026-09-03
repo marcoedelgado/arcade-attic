@@ -517,6 +517,7 @@ function updateHud() {
 }
 
 function flash(verdict) {
+  if (reduceMotion()) return;
   const cls = `flash-${verdict}`;
   root.classList.remove('flash-perfect', 'flash-good', 'flash-sloppy', 'flash-burnt');
   void root.offsetWidth;

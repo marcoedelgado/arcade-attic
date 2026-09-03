@@ -241,6 +241,7 @@
   .ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { animation: none; }
   .ww.flash-perfect, .ww.flash-good, .ww.flash-sloppy, .ww.flash-burnt { animation: none; }
   .ww-slot-new { animation: none; }
+  .ww-slot.is-burnt, .ww-plate.is-overflow { animation: none; }
   .ww-say { animation: none; opacity: 1; }
   /* meter marker / waffle colour still update — they are the mechanic */
 }
