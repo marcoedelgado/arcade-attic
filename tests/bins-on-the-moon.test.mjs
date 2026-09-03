@@ -96,3 +96,11 @@ test('pickItems: deterministic for a given rng seed', () => {
 test('pickItems: throws when the pool has nothing for the bins', () => {
   assert.throws(() => pickItems([{ emoji: 'x', name: 'x', bin: 'nope' }], ['recycling'], 4, seeded(1)));
 });
+
+test('pickItems: throws when a requested bin has no items (partial pool match)', () => {
+  const poolWithRecyclingOnly = [
+    { emoji: 'r', name: 'r0', bin: 'recycling' },
+    { emoji: 'r', name: 'r1', bin: 'recycling' },
+  ];
+  assert.throws(() => pickItems(poolWithRecyclingOnly, ['recycling', 'food'], 4, seeded(1)));
+});

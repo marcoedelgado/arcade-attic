@@ -36,17 +36,24 @@ export function pickItems(pool, binIds, count, rng = Math.random) {
   }
   const pickFrom = (arr) => arr[Math.floor(rng() * arr.length)];
 
+  // Check that every requested bin has at least one available item.
+  for (const id of binIds) {
+    if (!available.some((it) => it.bin === id)) {
+      throw new Error(`pickItems: bin "${id}" has no pool items`);
+    }
+  }
+
   const result = [];
   // 1. Guarantee one item per active bin (space permitting).
   for (const id of binIds) {
     if (result.length >= count) break;
     result.push(pickFrom(available.filter((it) => it.bin === id)));
   }
-  // 2. Fill the rest — prefer items not yet used, never repeat back-to-back.
+  // 2. Fill the rest — prefer items not yet used.
   while (result.length < count) {
     const unused = available.filter((it) => !result.includes(it));
-    const pool2 = (unused.length ? unused : available).filter((it) => it !== result[result.length - 1]);
-    result.push(pickFrom(pool2.length ? pool2 : available));
+    const pool2 = unused.length ? unused : available;
+    result.push(pickFrom(pool2));
   }
   // 3. Fisher-Yates shuffle so the guaranteed picks aren't front-loaded.
   for (let i = result.length - 1; i > 0; i--) {
