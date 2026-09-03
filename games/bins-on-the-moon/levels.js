@@ -19,11 +19,39 @@ const HAND_TUNED = {
 
 export function levelConfig(n) {
   const level = Math.max(1, Math.floor(Number(n) || 1));
-  if (HAND_TUNED[level]) return { level, ...HAND_TUNED[level] };
+  if (HAND_TUNED[level]) return { level, ...HAND_TUNED[level], bins: [...HAND_TUNED[level].bins] };
   return {
     level,
     bins: [...BIN_IDS],
     count: Math.min(20, 12 + 2 * (level - 5)),
     visible: 5,
   };
+}
+
+export function pickItems(pool, binIds, count, rng = Math.random) {
+  const active = new Set(binIds);
+  const available = pool.filter((it) => active.has(it.bin));
+  if (available.length === 0) {
+    throw new Error(`pickItems: no pool items for bins [${binIds.join(', ')}]`);
+  }
+  const pickFrom = (arr) => arr[Math.floor(rng() * arr.length)];
+
+  const result = [];
+  // 1. Guarantee one item per active bin (space permitting).
+  for (const id of binIds) {
+    if (result.length >= count) break;
+    result.push(pickFrom(available.filter((it) => it.bin === id)));
+  }
+  // 2. Fill the rest — prefer items not yet used, never repeat back-to-back.
+  while (result.length < count) {
+    const unused = available.filter((it) => !result.includes(it));
+    const pool2 = (unused.length ? unused : available).filter((it) => it !== result[result.length - 1]);
+    result.push(pickFrom(pool2.length ? pool2 : available));
+  }
+  // 3. Fisher-Yates shuffle so the guaranteed picks aren't front-loaded.
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
