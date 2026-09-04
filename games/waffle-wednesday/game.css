@@ -121,18 +121,31 @@
   display: flex; gap: 12px; align-items: flex-start;
 }
 .ww-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; }
-.ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { width: 64px; height: 64px; }
-.ww-customer-name { font-size: 11px; color: var(--ink-dim); }
+.ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback {
+  width: 64px; height: 64px;
+  border: 3px solid var(--ww-slot-edge); border-radius: 4px;
+  background: var(--panel-bright);
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.45);
+}
+.ww-customer .ww-sprite-fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px;
+}
+.ww-customer-name {
+  font-family: var(--font-display); font-size: 8px; letter-spacing: 1px;
+  color: var(--ink-dim);
+}
 .ww-ticket {
   flex: 1;
-  background: #f7f0dc; color: #2a231a;
+  background: var(--ww-paper); color: var(--ww-paper-ink);
   border-radius: 4px; padding: 10px 12px;
   font-size: 13px; line-height: 1.35;
   box-shadow: var(--shadow);
   transform: rotate(-1deg);
 }
-.ww-ticket h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7a6a4a; }
-.ww-ticket .ww-ticket-flavour { font-style: italic; color: #6a5c40; margin-top: 6px; display: block; }
+.ww-ticket h3 { margin: 0 0 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--ww-paper-head); }
+.ww-ticket .ww-ticket-order { font-weight: 600; }
+.ww-ticket .ww-ticket-flavour { font-style: italic; font-size: 12px; color: var(--ww-paper-flav); margin-top: 6px; display: block; }
 .ww-patience {
   height: 8px; border-radius: 4px; margin-top: 8px;
   background: rgba(0,0,0,0.25); overflow: hidden;

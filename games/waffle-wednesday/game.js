@@ -299,7 +299,10 @@ function renderCounter() {
   const ticket = document.createElement('div');
   ticket.className = 'ww-ticket';
   ticket.innerHTML = '<h3>Order</h3>';
-  ticket.append(document.createTextNode(ticketText(cur.order)));
+  const orderLine = document.createElement('span');
+  orderLine.className = 'ww-ticket-order';
+  orderLine.textContent = ticketText(cur.order);
+  ticket.append(orderLine);
   if (cur.order.ticketText) {
     const flav = document.createElement('span');
     flav.className = 'ww-ticket-flavour';
