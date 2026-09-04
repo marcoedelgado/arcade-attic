@@ -1,7 +1,7 @@
 import { crewSpriteEl } from './sprites.js';
 import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
-import { rampFor, buildShift } from './shift.js';
+import { rampFor, buildShift, mulberry32 } from './shift.js';
 import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
 const BEST_KEY = 'waffle-wednesday:best';
@@ -215,6 +215,7 @@ function resetSlot(slot) {
     slot._fly.remove();
     slot._fly = null;
     slot._flying = false;
+    slot._flyTarget = null;
     state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
     renderStock();
   }
@@ -257,17 +258,7 @@ function flyWaffle(fromEl, toEl, frameId, done, opts = {}) {
   return fly;
 }
 
-/* ---------- Ticket + RNG helpers ---------- */
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+/* ---------- Ticket helpers ---------- */
 function donenessWord(target) {
   for (const v of content.donenessVocab) if (target <= v.max) return v.word;
   return content.donenessVocab.at(-1).word;
@@ -322,8 +313,8 @@ function pickLine(customer, key) {
 }
 
 /* ---------- Counter + queue ---------- */
-function faceEl(customer, small = false) {
-  if (customer.kind === 'crew') return crewSpriteEl(customer.who, small ? 'ww-sprite' : 'ww-sprite');
+function faceEl(customer) {
+  if (customer.kind === 'crew') return crewSpriteEl(customer.who, 'ww-sprite');
   const span = document.createElement('span');
   span.className = 'ww-sprite-fallback';
   span.textContent = ['🧑', '👩', '🧔', '👴', '👱', '🧑‍🦱'][customer.id % 6];
@@ -382,7 +373,7 @@ function renderCounter() {
     const f = document.createElement('div');
     f.className = 'ww-queue-face';
     f.style.setProperty('--depth', [0.78, 0.62, 0.5][i - 1]);
-    f.append(faceEl(nxt, true));
+    f.append(faceEl(nxt));
     const qt = document.createElement('div');
     qt.className = 'ww-queue-ticket';
     qt.textContent = ticketText(nxt.order);
@@ -567,7 +558,11 @@ function onStockClick() {
   const slot = slots.find((s) => s.el.dataset.empty === 'true' && !s._flying);
   if (!slot) return;   // both toasters occupied
   const frontId = state.shift[state.index].id;
-  const frontBusy = slots.some((s) => s.forCustomerId === frontId && (s.cooking || s._settled != null));
+  // a slot is busy for the front customer from drop, through the settle window
+  // (s.cooking and s._settled both go briefly false mid-eject), to plated —
+  // dataset.empty covers all of that; _flyTarget covers a carry-in still in the air
+  const frontBusy = slots.some((s) =>
+    (s.forCustomerId === frontId && s.el.dataset.empty === 'false') || s._flyTarget === frontId);
   const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
   if (!target) return;
 
@@ -577,6 +572,7 @@ function onStockClick() {
   const land = () => {
     slot._fly = null;
     slot._flying = false;
+    slot._flyTarget = null;
     const cur = state.shift[state.index];
     if (!cur || target.id < cur.id) {           // that customer already left — refund
       state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
@@ -590,6 +586,7 @@ function onStockClick() {
 
   if (reduceMotion()) { land(); return; }
   slot._flying = true;
+  slot._flyTarget = target.id;
   slot._fly = flyWaffle(root.querySelector('.ww-stock-pile'), slot.el, 'pale', () => {
     if (slot._fly) land();   // still ours — a reset would have cleared it
   });
@@ -682,18 +679,21 @@ function updateHud() {
   hud.querySelectorAll('.ww-strikes span').forEach((s, i) => s.classList.toggle('is-lit', i < state.strikes));
 }
 
+let flashDone = null;
 function flash(verdict) {
   if (reduceMotion()) return;
+  if (flashDone) root.removeEventListener('animationend', flashDone);   // supersede any in-flight flash
   const cls = `flash-${verdict}`;
   root.classList.remove('flash-perfect', 'flash-good', 'flash-sloppy', 'flash-burnt');
   void root.offsetWidth;
   root.classList.add(cls);
-  const done = (e) => {
+  flashDone = (e) => {
     if (e.target !== root) return;
     root.classList.remove(cls);
-    root.removeEventListener('animationend', done);
+    root.removeEventListener('animationend', flashDone);
+    flashDone = null;
   };
-  root.addEventListener('animationend', done);
+  root.addEventListener('animationend', flashDone);
 }
 
 function onServe() {

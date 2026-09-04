@@ -1,5 +1,17 @@
 // shift.js — pure. No DOM, no fetch. Takes content + an injectable rng.
 
+// Deterministic PRNG (mulberry32). Seed it for a repeatable shift; the game
+// seeds with the clock, the tests with fixed integers.
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function rampFor(index) {
   const n = Math.max(1, Math.min(20, Math.floor(Number(index) || 1)));
   if (n <= 4)  return { bandWidth: 25, meterRate: 14, toppingCount: [1, 1], syrupChance: 0,    slots: 1, patience: 22 };
