@@ -484,3 +484,16 @@ test('a full 20-customer shift runs to "complete" with no DOM', () => {
   assert.equal(s.strikes, 0);
   assert.equal(s.score, 20 * 250);
 });
+
+test('current() is null once the shift is over (game.js guards stock taps on this)', () => {
+  const served = makeDirector(roster(1));
+  served.serve(goodServe);
+  assert.equal(served.current(), null);
+
+  const struck = makeDirector(roster(3));
+  struck.walkout();
+  struck.walkout();
+  struck.walkout();
+  assert.equal(struck.isOver(), true);
+  assert.equal(struck.upcoming().length, 0);
+});

@@ -2,6 +2,7 @@ import { crewSpriteEl } from './sprites.js';
 import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
 import { rampFor, buildShift, mulberry32 } from './shift.js';
+import { makeDirector } from './director.js';
 import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
 const BEST_KEY = 'waffle-wednesday:best';
@@ -13,13 +14,16 @@ const reduceMotion = () =>
 const content = { crew: [], toppings: [], names: [], lines: {}, donenessVocab: [], syrupChoices: [], roasts: {} };
 const state = {
   phase: 'title',
-  shift: [], index: 0,
-  strikes: 0, score: 0, perfects: 0, served: 0,
-  walkers: [],
+  shift: [],
   patienceRaf: 0, patienceStart: 0, patienceMs: 0,
-  resolving: false,
+  resolving: false,   // a customer is leaving the counter — hold input until the next one lands
   stock: makeStock(), stockTimer: 0,
 };
+
+// The running shift: index, strikes, score, and the serve/walkout transitions.
+// Rebuilt by startShift(); everything below reads it rather than a local counter.
+let director = null;
+const current = () => director.current();
 
 const TOAST = { CARRYOVER: 8, SETTLE_MS: 600 };
 const clampDoneness = (n) => Math.max(0, Math.min(100, n));
@@ -335,7 +339,7 @@ function faceEl(customer) {
 function renderCounter() {
   root.querySelector('.ww-top')?.remove();
   root.querySelector('.ww-serve')?.removeAttribute('disabled');
-  const cur = state.shift[state.index];
+  const cur = current();
   if (!cur) return;
 
   const top = document.createElement('div');
@@ -380,19 +384,17 @@ function renderCounter() {
   queue.appendChild(label);
   const rail = document.createElement('div');
   rail.className = 'ww-queue-rail';
-  for (let i = 1; i <= 3; i++) {
-    const nxt = state.shift[state.index + i];
-    if (!nxt) break;
+  director.upcoming(3).forEach((nxt, i) => {
     const f = document.createElement('div');
     f.className = 'ww-queue-face';
-    f.style.setProperty('--depth', [0.78, 0.62, 0.5][i - 1]);
+    f.style.setProperty('--depth', [0.78, 0.62, 0.5][i]);
     f.append(faceEl(nxt));
     const qt = document.createElement('div');
     qt.className = 'ww-queue-ticket';
     qt.textContent = ticketText(nxt.order);
     f.appendChild(qt);
     rail.appendChild(f);
-  }
+  });
   queue.appendChild(rail);
 
   top.append(counter, queue);
@@ -400,7 +402,7 @@ function renderCounter() {
 }
 
 function startPatience() {
-  const cur = state.shift[state.index];
+  const cur = current();
   state.patienceMs = cur.ramp.patience * 1000;
   state.patienceStart = performance.now();
   const fill = root.querySelector('.ww-patience-fill');
@@ -421,34 +423,35 @@ function patienceLeft() {
 }
 
 /* ---------- Shift flow ---------- */
+// walkout() and onServe() tell the director a customer left the counter, then
+// play the reaction for a beat before resolveStep() shows whatever comes next —
+// the director has already advanced, so a late timer has nothing to corrupt.
 function walkout() {
+  if (state.resolving) return;
   stopPatience();
-  const cur = state.shift[state.index];
-  state.strikes += 1;
-  state.walkers.push(cur.name);
-  state.score -= 120;
+  const cur = current();
+  const step = director.walkout();
   say(pickLine(cur, 'walkout'));
   slots.forEach(resetSlot);
   resetPlate();
-  state.resolving = false;
-  const at = state.index;
-  setTimeout(() => {
-    if (state.index !== at) return;   // a serve already advanced us
-    if (state.strikes >= 3) endShift('bad');
-    else nextCustomer();
-  }, 1400);
+  state.resolving = true;
+  updateHud();
+  setTimeout(() => resolveStep(step), 1400);
 }
 
-function nextCustomer() {
-  state.index += 1;
+function resolveStep(step) {
+  if (step.done) { endShift(step.done); return; }
+  showNextCustomer();
+}
+
+function showNextCustomer() {
   state.resolving = false;
-  if (state.index >= 20) { endShift('complete'); return; }
   for (const s of slots) {
-    if (s.forCustomerId != null && s.forCustomerId < state.shift[state.index].id) resetSlot(s);
+    if (s.forCustomerId != null && s.forCustomerId < current().id) resetSlot(s);
   }
   resetPlate();
   renderCounter();
-  say(pickLine(state.shift[state.index], 'greet'), { delay: 1800 });
+  say(pickLine(current(), 'greet'), { delay: 1800 });
   updateHud();
   startPatience();
   paintPlate();
@@ -462,11 +465,11 @@ function ratingFor(score, kind) {
   return { key: 'rough', title: 'Rough Wednesday' };
 }
 
-function fillRoast(tpl) {
+function fillRoast(tpl, walkers) {
   const name = content.crew[Math.floor(Math.random() * content.crew.length)].name;
   return tpl
     .replaceAll('{who}', name)
-    .replaceAll('{walkers}', state.walkers.join(', ') || 'nobody');
+    .replaceAll('{walkers}', walkers.join(', ') || 'nobody');
 }
 
 function endShift(kind) {
@@ -477,11 +480,12 @@ function endShift(kind) {
   state.phase = kind === 'bad' ? 'bad' : 'complete';
   state.resolving = false;
 
-  const rating = ratingFor(state.score, kind);
-  saveBest({ score: state.score, rating: rating.title, perfects: state.perfects, served: state.served });
+  const tally = director.stats();
+  const rating = ratingFor(tally.score, kind);
+  saveBest({ score: tally.score, rating: rating.title, perfects: tally.perfects, served: tally.served });
 
   const pool = content.roasts[rating.key] ?? content.roasts.rough;
-  const roast = fillRoast(pool[Math.floor(Math.random() * pool.length)]);
+  const roast = fillRoast(pool[Math.floor(Math.random() * pool.length)], tally.walkers);
 
   const looks = {
     chefsKiss:   { cls: 'is-kiss',  emoji: '👌' },
@@ -489,7 +493,7 @@ function endShift(kind) {
     rough:       { cls: 'is-rough', emoji: '😕' },
     badWednesday:{ cls: 'is-bad',   emoji: null },
   }[rating.key] ?? { cls: 'is-rough', emoji: '😕' };
-  const highlight = state.strikes > 0 ? 'walked' : 'perfect';
+  const highlight = tally.strikes > 0 ? 'walked' : 'perfect';
 
   root.replaceChildren();
   root.classList.toggle('ww-bad', rating.key === 'badWednesday');
@@ -508,7 +512,7 @@ function endShift(kind) {
 
   const score = document.createElement('div');
   score.className = 'ww-report-score';
-  score.textContent = state.score.toLocaleString();
+  score.textContent = tally.score.toLocaleString();
 
   const roastEl = document.createElement('p');
   roastEl.className = 'ww-report-roast';
@@ -516,7 +520,7 @@ function endShift(kind) {
 
   const stats = document.createElement('div');
   stats.className = 'ww-report-stats';
-  for (const [label, n] of [['perfect', state.perfects], ['served', state.served], ['walked', state.strikes]]) {
+  for (const [label, n] of [['perfect', tally.perfects], ['served', tally.served], ['walked', tally.strikes]]) {
     const cell = document.createElement('div');
     if (label === highlight) cell.className = 'is-lit';
     cell.innerHTML = `<b>${n}</b><span>${label}</span>`;
@@ -551,16 +555,17 @@ function onSlotClick(slot) {
 }
 
 function onStockClick() {
+  if (!current()) return;   // shift over — a reaction beat is still playing out
   if (!canSpawn(state.stock)) { say('Out of batter — give it a second.'); return; }
   const slot = slots.find((s) => s.el.dataset.empty === 'true' && !s._flying);
   if (!slot) return;   // both toasters occupied
-  const frontId = state.shift[state.index].id;
+  const frontId = current().id;
   // a slot is busy for the front customer from drop, through the settle window
   // (s.cooking and s._settled both go briefly false mid-eject), to plated —
   // dataset.empty covers all of that; _flyTarget covers a carry-in still in the air
   const frontBusy = slots.some((s) =>
     (s.forCustomerId === frontId && s.el.dataset.empty === 'false') || s._flyTarget === frontId);
-  const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
+  const target = frontBusy ? director.upcoming(1)[0] : current();
   if (!target) return;
 
   take(state.stock);           // decrement on the tap; resetSlot refunds a cancelled flight
@@ -570,7 +575,7 @@ function onStockClick() {
     slot._fly = null;
     slot._flying = false;
     slot._flyTarget = null;
-    const cur = state.shift[state.index];
+    const cur = current();
     if (!cur || target.id < cur.id) {           // that customer already left — refund
       state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
       renderStock();
@@ -609,12 +614,13 @@ function startStockClock() {
 function startShift() {
   state.phase = 'shift';
   root.classList.remove('ww-bad');
-  Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [], resolving: false });
+  state.resolving = false;
   state.stock = makeStock();
   state.shift = buildShift(
     { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
     mulberry32(Date.now() >>> 0),
   );
+  director = makeDirector(state.shift);
   root.replaceChildren();
 
   const station = document.createElement('div');
@@ -647,7 +653,7 @@ function startShift() {
   root.appendChild(station);
 
   renderCounter();
-  say(pickLine(state.shift[0], 'greet'), { delay: 1800 });
+  say(pickLine(current(), 'greet'), { delay: 1800 });
   renderHud();
   renderStock();
   startStockClock();
@@ -671,9 +677,10 @@ function renderHud() {
 function updateHud() {
   const hud = root.querySelector('.ww-hud');
   if (!hud) return;
-  hud.querySelector('.ww-hud-cust').textContent = `Customers ${Math.min(state.index + 1, 20)}/20`;
-  hud.querySelector('.ww-hud-score').textContent = `${state.score.toLocaleString()}`;
-  hud.querySelectorAll('.ww-strikes span').forEach((s, i) => s.classList.toggle('is-lit', i < state.strikes));
+  const s = director.stats();
+  hud.querySelector('.ww-hud-cust').textContent = `Customers ${Math.min(s.index + 1, 20)}/20`;
+  hud.querySelector('.ww-hud-score').textContent = `${s.score.toLocaleString()}`;
+  hud.querySelectorAll('.ww-strikes span').forEach((pip, i) => pip.classList.toggle('is-lit', i < s.strikes));
 }
 
 let flashDone = null;
@@ -731,7 +738,7 @@ function serveStamp(result) {
 
 function onServe() {
   if (state.resolving) return;
-  const cur = state.shift[state.index];
+  const cur = current();
   const slot = slots.find((s) => s.forCustomerId === cur.id && s._settled != null)
     ?? slots.find((s) => s._settled != null);
   if (!slot) { say('Toast something first.'); return; }
@@ -751,9 +758,7 @@ function onServe() {
     patienceLeft: patienceLeft(),
   });
 
-  state.score += result.points + result.tip;
-  if (result.perfect) state.perfects += 1;
-  state.served += 1;
+  const step = director.serve(result);
 
   flash(result.verdict);
   serveStamp(result);
@@ -768,11 +773,7 @@ function onServe() {
   resetPlate();
   updateHud();
 
-  const at = state.index;
-  setTimeout(() => {
-    if (state.index !== at) return;
-    nextCustomer();
-  }, 900);
+  setTimeout(() => resolveStep(step), 900);
 }
 
 /* ---------- Plating ---------- */
@@ -888,8 +889,8 @@ function paintPlate() {
 
 const HINT_UNTIL = 4;   // green "wanted" chip borders help for the opening tier, then off
 function syncChips() {
-  const wanted = new Set(state.shift[state.index]?.order.toppings ?? []);
-  const hint = state.index < HINT_UNTIL;
+  const wanted = new Set(current()?.order.toppings ?? []);
+  const hint = director.stats().index < HINT_UNTIL;
   root.querySelectorAll('.ww-chip').forEach((c) => {
     c.classList.toggle('is-on', plate.toppings.has(c.dataset.topping));
     c.classList.toggle('is-wanted', hint && wanted.has(c.dataset.topping) && !plate.toppings.has(c.dataset.topping));
