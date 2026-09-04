@@ -126,22 +126,16 @@ const FIX = {
 };
 
 test('rampFor: clamps and never eases across a boundary', () => {
-  assert.equal(rampFor(0).slots, rampFor(1).slots);
-  assert.equal(rampFor(999).slots, rampFor(20).slots);
+  assert.deepEqual(rampFor(0), rampFor(1));
+  assert.deepEqual(rampFor(999), rampFor(20));
   let prev = rampFor(1);
   for (let n = 2; n <= 20; n++) {
     const r = rampFor(n);
     assert.ok(r.bandWidth <= prev.bandWidth, `band width grew at ${n}`);
-    assert.ok(r.slots >= prev.slots, `slots dropped at ${n}`);
     assert.ok(r.patience <= prev.patience, `patience grew at ${n}`);
     assert.ok(r.meterRate >= prev.meterRate, `meter slowed at ${n}`);
     prev = r;
   }
-});
-
-test('rampFor: second toaster slot appears at customer 10', () => {
-  assert.equal(rampFor(9).slots, 1);
-  assert.equal(rampFor(10).slots, 2);
 });
 
 test('buildShift: always 20 customers, ids 1..20 in order', () => {

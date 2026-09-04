@@ -449,24 +449,10 @@ function nextCustomer() {
   resetPlate();
   renderCounter();
   say(pickLine(state.shift[state.index], 'greet'), { delay: 1800 });
-  syncSlotCount();
   updateHud();
   startPatience();
   paintPlate();
   syncChips();
-}
-
-function syncSlotCount() {
-  const want = state.shift[state.index].ramp.slots;
-  const toaster = root.querySelector('.ww-toaster');
-  while (slots.length < want) {
-    const s = makeSlot();
-    s.el.classList.add('ww-slot-new');
-    s.el.addEventListener('animationend', () => s.el.classList.remove('ww-slot-new'), { once: true });
-    slots.push(s);
-    toaster.appendChild(s.el);
-    say('Second toaster — you can pre-toast for the queue now.');
-  }
 }
 
 function ratingFor(score, kind) {
@@ -544,11 +530,7 @@ function endShift(kind) {
   again.className = 'aa-btn ww-report-new';
   again.textContent = 'New shift';
   again.addEventListener('click', () => startShift());
-  const home = document.createElement('a');
-  home.className = 'aa-btn ww-report-home';
-  home.href = '../../';
-  home.textContent = '← Attic';
-  actions.append(again, home);
+  actions.append(again);   // the top-of-page "← The Attic" link covers going back
 
   card.append(crest, h2, score, roastEl, stats, actions);
   root.appendChild(card);
@@ -865,11 +847,13 @@ function paintPlate() {
   plateEl.classList.toggle('is-overflow', plate.syrupOverflow);
 }
 
+const HINT_UNTIL = 4;   // green "wanted" chip borders help for the opening tier, then off
 function syncChips() {
   const wanted = new Set(state.shift[state.index]?.order.toppings ?? []);
+  const hint = state.index < HINT_UNTIL;
   root.querySelectorAll('.ww-chip').forEach((c) => {
     c.classList.toggle('is-on', plate.toppings.has(c.dataset.topping));
-    c.classList.toggle('is-wanted', wanted.has(c.dataset.topping) && !plate.toppings.has(c.dataset.topping));
+    c.classList.toggle('is-wanted', hint && wanted.has(c.dataset.topping) && !plate.toppings.has(c.dataset.topping));
   });
 }
 

@@ -14,10 +14,10 @@ export function mulberry32(seed) {
 
 export function rampFor(index) {
   const n = Math.max(1, Math.min(20, Math.floor(Number(index) || 1)));
-  if (n <= 4)  return { bandWidth: 25, meterRate: 14, toppingCount: [1, 1], syrupChance: 0,    slots: 1, patience: 22 };
-  if (n <= 9)  return { bandWidth: 18, meterRate: 18, toppingCount: [1, 2], syrupChance: 0.30, slots: 1, patience: 18 };
-  if (n <= 14) return { bandWidth: 14, meterRate: 22, toppingCount: [2, 3], syrupChance: 0.50, slots: 2, patience: 15 };
-  return         { bandWidth: 10, meterRate: 27, toppingCount: [3, 4], syrupChance: 0.50, slots: 2, patience: 12 };
+  if (n <= 4)  return { bandWidth: 25, meterRate: 14, toppingCount: [1, 1], syrupChance: 0,    patience: 22 };
+  if (n <= 9)  return { bandWidth: 18, meterRate: 18, toppingCount: [1, 2], syrupChance: 0.30, patience: 18 };
+  if (n <= 14) return { bandWidth: 14, meterRate: 22, toppingCount: [2, 3], syrupChance: 0.50, patience: 15 };
+  return         { bandWidth: 10, meterRate: 27, toppingCount: [3, 4], syrupChance: 0.50, patience: 12 };
 }
 
 // Fisher-Yates using rng; returns a new array.

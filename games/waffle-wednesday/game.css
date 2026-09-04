@@ -192,8 +192,6 @@
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.35, 1);
 }
 @keyframes ww-shudder { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
-.ww-slot-new { animation: ww-slot-in 0.4s ease; }
-@keyframes ww-slot-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ---------- Counter ---------- */
 .ww-top {
@@ -413,14 +411,12 @@
 .ww-report-stats .is-lit b { color: var(--stat); }
 .ww-report-stats span { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-dim); }
 
-.ww-report-actions { display: flex; gap: 10px; width: 100%; max-width: 300px; }
-.ww-report-actions a { text-decoration: none; }
+.ww-report-actions { display: flex; justify-content: center; width: 100%; max-width: 300px; }
 .ww-report-actions .aa-btn {
-  flex: 1; font-family: var(--font-display); font-size: 10px; line-height: 1.5;
-  padding: 12px 4px; border: 3px solid var(--attic-deep); border-radius: 8px; text-align: center;
+  font-family: var(--font-display); font-size: 11px; line-height: 1.5;
+  padding: 13px 22px; border: 3px solid var(--attic-deep); border-radius: 8px; text-align: center;
 }
 .ww-report-new { color: var(--attic-deep); }
-.ww-report-home { color: var(--ink); background: var(--panel-bright); }
 
 /* ---------- Steam ---------- */
 .ww-steam {
@@ -447,7 +443,6 @@
   .ww-steam, .ww-confetti { display: none; }
   .ww-customer .ww-sprite, .ww-customer .ww-sprite-fallback { animation: none; }
   .ww.flash-perfect, .ww.flash-good, .ww.flash-sloppy, .ww.flash-burnt { animation: none; }
-  .ww-slot-new { animation: none; }
   .ww-slot.is-burnt, .ww-plate.is-overflow { animation: none; }
   .ww-stock::after { animation: none; }
   .ww-fly { display: none; }   /* travel is never created under reduced motion, belt and braces */
