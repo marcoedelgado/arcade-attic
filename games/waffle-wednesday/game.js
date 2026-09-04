@@ -167,19 +167,27 @@ function paintSlot(rec) {
   rec.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(st.value))}")`;
 }
 
-// One rAF loop drives every toasting slot. It steps the sim and repaints; ejected
-// slots hold still (their own settle glide runs in ejectWaffle).
+// One rAF loop drives every toasting slot: step the sim, repaint. A slot that
+// crosses the burn line while it's ticking (nobody ejected it) burns in place.
+// Ejected slots hold still — their settle glide runs in ejectWaffle.
 let toasterRaf = 0;
 function toasterLoop(tPrev) {
   return (tNow) => {
     for (const rec of slots) {
-      if (rec.sim && rec.sim.status().phase === 'toasting') {
-        rec.sim.tick(tNow - tPrev);
-        paintSlot(rec);
-      }
+      if (rec.sim?.status().phase !== 'toasting') continue;
+      rec.sim.tick(tNow - tPrev);
+      paintSlot(rec);
+      if (rec.sim.status().phase === 'burnt') burntInSlot(rec);
     }
     toasterRaf = requestAnimationFrame(toasterLoop(tNow));
   };
+}
+
+// The slot's waffle is burnt (ejected too late, or left to burn on its own).
+function burntInSlot(rec) {
+  rec.el.querySelector('.ww-steam')?.remove();
+  rec.el.classList.add('is-burnt');
+  rec.hintEl.textContent = 'burnt!';
 }
 function startToasterLoop() {
   cancelAnimationFrame(toasterRaf);
@@ -213,8 +221,8 @@ function ejectWaffle(rec) {
     rec.markerEl.style.top = meterPct(shown);
     rec.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(shown))}")`;
     if (k < 1) { requestAnimationFrame(glide); return; }
-    rec.hintEl.textContent = burnt ? 'burnt!' : 'plated';
-    if (burnt) rec.el.classList.add('is-burnt');
+    if (burnt) burntInSlot(rec);
+    else rec.hintEl.textContent = 'plated';
   };
   requestAnimationFrame(glide);
 
