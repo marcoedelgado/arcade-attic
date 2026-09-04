@@ -19,7 +19,7 @@ See `README.md` for the full "how to add a game" walkthrough.
 
 ### Issue tracker
 
-Issues and specs live as markdown files under `.scratch/<feature-slug>/` in this repo. See `docs/agents/issue-tracker.md`.
+Issues and specs live as markdown files under `.scratch/<feature-slug>/`, kept locally only (`.scratch/` is gitignored). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
