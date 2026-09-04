@@ -1,5 +1,23 @@
 /* Waffle Wednesday — all game visuals. Shared tokens come from ../../assets/styles.css */
 
+/* ---------- Game-scoped tokens (art-direction pass) ---------- */
+/* Kept here, not in the shared sheet: every other game and the home page load
+   that file, and none of these belong outside the waffle counter. */
+:root {
+  --ww-griddle:     linear-gradient(180deg, #2a1c34 0%, #3a2438 55%, #4a2f2a 100%);
+  --ww-slot-edge:   #0c0a18;   /* near-black, one notch off --attic-deep */
+  --ww-slot-mouth:  #16151d;
+  --ww-paper:       #f7f0dc;   /* ticket / order slip */
+  --ww-paper-ink:   #2a231a;
+  --ww-paper-head:  #7a6a4a;
+  --ww-paper-flav:  #6a5c40;
+  --ww-scrim:       4 2 14;    /* rgb() channels for HUD / report / bubble overlays */
+  --ww-char:        #33231a;   /* burnt waffle */
+  --ww-meter-cap:   #17100c;   /* top of the doneness gradient */
+  --ww-meter-raw:   #f4e4c4;   /* bottom (raw batter) */
+  --ww-bad-tint:    #1c040e;   /* Bad Wednesday overlay */
+}
+
 .ww {
   position: relative;
   width: 100%;
