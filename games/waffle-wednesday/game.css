@@ -12,10 +12,9 @@
   --ww-paper-head:  #7a6a4a;
   --ww-paper-flav:  #6a5c40;
   --ww-scrim:       4 2 14;    /* rgb() channels for HUD / report / bubble overlays */
-  --ww-char:        #33231a;   /* burnt waffle */
   --ww-meter-cap:   #17100c;   /* top of the doneness gradient */
   --ww-meter-raw:   #f4e4c4;   /* bottom (raw batter) */
-  --ww-bad-tint:    #1c040e;   /* Bad Wednesday overlay */
+  --ww-bad-tint:    28 4 14;   /* rgb() channels — Bad Wednesday overlay */
   --ww-mono:        ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
 }
 
@@ -26,7 +25,7 @@
   overflow: hidden;
   border: 2px solid var(--edge);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #2a1c34 0%, #3a2438 55%, #4a2f2a 100%);
+  background: var(--ww-griddle);
   box-shadow: var(--shadow);
   color: var(--ink);
   user-select: none;
@@ -376,7 +375,7 @@
 }
 .ww-report.is-solid { --stat: var(--neon-green); --stat-rgb: 61 220 151; }
 .ww-report.is-rough { --stat: var(--neon-blue);  --stat-rgb: 111 179 255; }
-.ww-report.is-bad   { background: rgb(28 4 14 / 0.82); }
+.ww-report.is-bad   { background: rgb(var(--ww-bad-tint) / 0.82); }
 .ww.ww-bad { border-color: var(--neon-pink); }
 
 .ww-report-crest { font-size: 34px; line-height: 1; display: flex; gap: 6px; }
