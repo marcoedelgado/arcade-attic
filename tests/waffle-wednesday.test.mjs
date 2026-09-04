@@ -112,6 +112,68 @@ test('scoreServe: verdict is "good" above the threshold, else "sloppy"', () => {
   assert.equal(sloppy.verdict, 'sloppy'); // 20 - 25 + 40 = 35
 });
 
+test('scoreServe: no serve stamps on a burnt serve', () => {
+  const r = scoreServe({ ...base, doneness: 95, toppings: ['x'], wanted: ['x'] });
+  assert.equal(r.stamps, null);
+});
+
+test('scoreServe: a perfect serve stamps gold across the board', () => {
+  const r = scoreServe({
+    ...base, doneness: 50,
+    toppings: ['a', 'b'], wanted: ['a', 'b'],
+    syrupLevel: 50, wantedSyrup: { target: 50, tolerance: 15 },
+  });
+  assert.deepEqual(r.stamps, { doneness: 'gold', toppings: 'gold', syrup: 'gold' });
+  assert.equal(r.bonus, 150);
+});
+
+test('scoreServe: a perfect serve at the band edge still stamps three golds', () => {
+  const r = scoreServe({
+    ...base, doneness: 60, // edge of [40, 60] — still in band, still perfect
+    toppings: ['a'], wanted: ['a'],
+    syrupLevel: 65, wantedSyrup: { target: 50, tolerance: 15 }, // edge of tolerance
+  });
+  assert.equal(r.perfect, true);
+  assert.deepEqual(r.stamps, { doneness: 'gold', toppings: 'gold', syrup: 'gold' });
+});
+
+test('scoreServe: bonus is 0 on anything short of perfect', () => {
+  assert.equal(scoreServe({ ...base, doneness: 20 }).bonus, 0);
+  assert.equal(scoreServe({ ...base, doneness: 95 }).bonus, 0);
+});
+
+test('scoreServe: doneness stamp tiers by distance from the band centre', () => {
+  // a missing topping keeps the serve off "perfect" so the doneness stamp is judged on its own
+  const at = (d) => scoreServe({ ...base, doneness: d, wanted: ['x'] }).stamps.doneness;
+  assert.equal(at(50), 'gold');    // dead centre of [40, 60]
+  assert.equal(at(60), 'silver');  // on the band edge
+  assert.equal(at(64), 'bronze');  // just past the edge
+  assert.equal(at(20), 'cross');   // nowhere near
+});
+
+test('scoreServe: toppings stamp tiers by how much of the wanted set matched', () => {
+  // doneness out of band keeps the serve off "perfect"
+  const t = (toppings, wanted) =>
+    scoreServe({ ...base, doneness: 20, toppings, wanted }).stamps.toppings;
+  assert.equal(t(['a', 'b'], ['a', 'b']), 'gold');
+  assert.equal(t(['a'], ['a', 'b']), 'silver');
+  assert.equal(t([], ['a', 'b', 'c']), 'cross');
+});
+
+test('scoreServe: syrup stamp tiers by distance from tolerance; overflow is always a cross', () => {
+  const s = (extra) => scoreServe({ ...base, doneness: 50, wanted: ['x'], ...extra }).stamps.syrup;
+  assert.equal(s({ syrupLevel: 50, wantedSyrup: { target: 50, tolerance: 15 } }), 'gold');
+  assert.equal(s({ syrupLevel: 65, wantedSyrup: { target: 50, tolerance: 15 } }), 'silver');
+  assert.equal(
+    s({ syrupLevel: 100, syrupOverflow: true, wantedSyrup: { target: 95, tolerance: 20 } }),
+    'cross',
+  );
+});
+
+test('scoreServe: leaving syrup off an order that did not want it is a gold stamp', () => {
+  assert.equal(scoreServe({ ...base, doneness: 50 }).stamps.syrup, 'gold');
+});
+
 const FIX = {
   crew: ['marriott', 'pitt', 'nash', 'marco', 'james', 'groves'].map((id) => ({
     id,

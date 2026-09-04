@@ -296,7 +296,46 @@
 @keyframes ww-say-bob { 50% { transform: translateY(-3px); } }
 
 /* ---------- Plating ---------- */
-.ww-plate-area { display: flex; align-items: flex-end; gap: 8px; justify-content: center; }
+.ww-plate-area { position: relative; display: flex; align-items: flex-end; gap: 8px; justify-content: center; }
+
+/* ---------- Post-serve stamp (artboard 04b) ---------- */
+.ww-stamp {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 8; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  padding: 12px 16px; border-radius: 8px;
+  background: rgb(var(--ww-scrim) / 0.5); backdrop-filter: blur(1px);
+  border: 2px solid var(--edge); box-shadow: 0 0 0 3px rgba(0,0,0,0.2);
+  animation: ww-stamp-in 0.24s cubic-bezier(0.34, 1.4, 0.5, 1);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.ww-stamp[data-tone="perfect"] { border-color: rgba(255,211,77,0.6); }
+.ww-stamp[data-tone="rough"]   { border-color: rgba(255,93,115,0.6); }
+.ww-stamp.is-leaving { opacity: 0; transform: translate(-50%, -58%); }
+.ww-stamp.is-still { animation: none; }
+
+.ww-stamp-badges { display: flex; gap: 10px; }
+.ww-stamp-badge { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ww-stamp-mark {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #2b2350; border: 2px solid var(--attic-deep); box-shadow: 2px 2px 0 var(--attic-deep);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.ww-stamp-badge:nth-child(1) .ww-stamp-mark { transform: rotate(-5deg); }
+.ww-stamp-badge:nth-child(2) .ww-stamp-mark { transform: rotate(4deg); }
+.ww-stamp-badge:nth-child(3) .ww-stamp-mark { transform: rotate(-3deg); }
+.ww-stamp-x { font-family: var(--font-display); font-size: 15px; color: var(--neon-pink); line-height: 1; }
+.ww-stamp-cat {
+  font-family: var(--ww-mono); font-size: 8px; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--ink);
+}
+.ww-stamp-delta {
+  font-family: var(--font-display); font-size: 12px; color: var(--ink);
+  text-shadow: 2px 2px 0 var(--attic-deep);
+}
+.ww-stamp[data-tone="perfect"] .ww-stamp-delta { color: var(--neon); }
+.ww-stamp[data-tone="rough"]   .ww-stamp-delta { color: var(--neon-pink); }
+@keyframes ww-stamp-in { from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; } }
 .ww-plate {
   position: relative;
   width: clamp(90px, 26vw, 120px); aspect-ratio: 1;
@@ -447,5 +486,7 @@
   .ww-stock::after { animation: none; }
   .ww-fly { display: none; }   /* travel is never created under reduced motion, belt and braces */
   .ww-say.is-shown { animation: none; }   /* no bob — still appears, lingers and clears on its timer */
+  .ww-stamp { animation: none; transition: opacity 0.2s ease; }   /* receipt still shows and holds, no scale-in / drift */
+  .ww-stamp.is-leaving { transform: translate(-50%, -50%); }
   /* meter marker / waffle colour still update — they are the mechanic */
 }

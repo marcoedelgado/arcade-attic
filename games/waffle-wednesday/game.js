@@ -693,6 +693,42 @@ function flash(verdict) {
   root.addEventListener('animationend', flashDone);
 }
 
+// Artboard 04b — a translucent receipt over the plate right after serve: a medal
+// per category, a recoloured score delta, ~1.8s then it fades. Burnt serves skip
+// it (they get the full-screen burnt flash instead — result.stamps is null).
+const STAMP_MEDALS = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+function serveStamp(result) {
+  if (!result.stamps) return;
+  const area = root.querySelector('.ww-plate-area');
+  if (!area) return;
+  area.querySelector('.ww-stamp')?.remove();
+
+  const badges = ['doneness', 'toppings', 'syrup'].map((cat) => {
+    const tier = result.stamps[cat];
+    const mark = STAMP_MEDALS[tier] ?? '<span class="ww-stamp-x">&times;</span>';
+    return `<span class="ww-stamp-badge"><span class="ww-stamp-mark">${mark}</span>`
+      + `<span class="ww-stamp-cat">${cat}</span></span>`;
+  }).join('');
+
+  const delta = result.points + result.tip;
+  const deltaText = result.perfect
+    ? `+${result.bonus} perfect`
+    : `${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`;
+  const tone = result.verdict === 'perfect' ? 'perfect'
+    : result.verdict === 'sloppy' ? 'rough' : 'plain';
+
+  const el = document.createElement('div');
+  el.className = 'ww-stamp';
+  el.dataset.tone = tone;
+  if (reduceMotion()) el.classList.add('is-still');
+  el.innerHTML = `<span class="ww-stamp-badges">${badges}</span>`
+    + `<span class="ww-stamp-delta">${deltaText}</span>`;
+  area.appendChild(el);
+
+  setTimeout(() => el.classList.add('is-leaving'), 1500);
+  setTimeout(() => el.remove(), 1850);
+}
+
 function onServe() {
   if (state.resolving) return;
   const cur = state.shift[state.index];
@@ -720,6 +756,7 @@ function onServe() {
   state.served += 1;
 
   flash(result.verdict);
+  serveStamp(result);
   const lineKey = result.verdict === 'perfect' ? 'happy'
     : result.verdict === 'good' ? 'happy'
     : result.verdict === 'sloppy' ? 'meh'
