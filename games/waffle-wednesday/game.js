@@ -63,8 +63,12 @@ function showTitle() {
   const wrap = document.createElement('div');
   wrap.className = 'ww-title';
 
+  const glyph = document.createElement('div');
+  glyph.className = 'ww-title-glyph';
+  glyph.textContent = '🧇';
+
   const h = document.createElement('h2');
-  h.textContent = 'Waffle Wednesday';
+  h.innerHTML = 'Waffle<br>Wednesday';
 
   const blurb = document.createElement('p');
   blurb.textContent = 'One shift. Twenty customers. Toast it right, top it faster. Three walkouts and it’s a bad Wednesday.';
@@ -75,7 +79,7 @@ function showTitle() {
   start.textContent = '🧇 Start shift';
   start.addEventListener('click', () => startShift());
 
-  wrap.append(h, blurb, start);
+  wrap.append(glyph, h, blurb, start);
 
   const best = loadBest();
   if (best) {
@@ -91,6 +95,16 @@ function showTitle() {
     reset.addEventListener('click', () => { resetBest(); showTitle(); });
     wrap.appendChild(reset);
   }
+
+  const shelf = document.createElement('div');
+  shelf.className = 'ww-title-shelf';
+  shelf.setAttribute('aria-hidden', 'true');
+  for (const e of ['🍓', '🍌', '🍫', '🥕', '🍯', '🍦']) {
+    const s = document.createElement('span');
+    s.textContent = e;
+    shelf.appendChild(s);
+  }
+  wrap.append(shelf);
 
   root.appendChild(wrap);
 }

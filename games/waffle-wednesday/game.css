@@ -16,6 +16,7 @@
   --ww-meter-cap:   #17100c;   /* top of the doneness gradient */
   --ww-meter-raw:   #f4e4c4;   /* bottom (raw batter) */
   --ww-bad-tint:    #1c040e;   /* Bad Wednesday overlay */
+  --ww-mono:        ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
 }
 
 .ww {
@@ -39,23 +40,40 @@
 .ww-title {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; text-align: center; padding: 24px;
+  gap: 16px; text-align: center; padding: 28px;
 }
+.ww-title::after {           /* griddle-warm base fade */
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 76px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.3));
+  pointer-events: none;
+}
+.ww-title-glyph { font-size: 44px; line-height: 1; }
 .ww-title h2 {
   font-family: var(--font-display);
-  font-size: clamp(14px, 4vw, 20px);
-  color: var(--neon);
-  margin: 0;
+  font-size: clamp(16px, 5vw, 20px); line-height: 1.6;
+  color: var(--neon); margin: 0;
+  text-shadow: 3px 3px 0 var(--attic-deep);
 }
-.ww-title p { margin: 0; color: var(--ink-dim); font-size: 13px; max-width: 30ch; }
-.ww-start { font-size: 18px; padding: 14px 22px; }
-.ww-best { font-size: 12px; color: var(--ink-dim); letter-spacing: 1px; text-transform: uppercase; }
+.ww-title p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.6; max-width: 30ch; }
+.aa-btn.ww-start {
+  font-family: var(--font-display); font-size: 14px; line-height: 1.5;
+  padding: 16px 20px; border: 3px solid var(--attic-deep); border-radius: 8px;
+}
+.ww-best {
+  font-family: var(--ww-mono); font-size: 11px; color: var(--ink-dim);
+  letter-spacing: 1px; text-transform: uppercase;
+}
 .ww-reset {
-  font-size: 11px; color: var(--ink-dim); background: none;
+  font-family: var(--ww-mono); font-size: 11px; color: var(--ink-dim); background: none;
   border: 1px solid var(--edge); border-radius: var(--radius);
-  padding: 4px 8px; cursor: pointer; opacity: 0.6;
+  padding: 5px 9px; cursor: pointer; opacity: 0.6;
 }
 .ww-reset:hover { opacity: 1; }
+.ww-title-shelf {
+  position: absolute; left: 0; right: 0; bottom: 16px;
+  display: flex; justify-content: center; gap: 10px;
+  font-size: 18px; opacity: 0.5; pointer-events: none;
+}
 
 /* ---------- Pixel sprite ---------- */
 .ww-sprite { image-rendering: pixelated; border-radius: 4px; }
