@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { isBurnt, scoreServe } from '../games/waffle-wednesday/scoring.js';
 import { rampFor, buildShift, mulberry32 as seeded } from '../games/waffle-wednesday/shift.js';
 import { makeDirector } from '../games/waffle-wednesday/director.js';
+import { CARRYOVER } from '../games/waffle-wednesday/toaster.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -315,7 +316,6 @@ test('every shipped order is physically servable', () => {
     { crew, toppings: cust.toppings, names: cust.names, syrupChoices: cust.syrupChoices },
     seeded(99),
   );
-  const CARRYOVER = 8; // must match game.js TOAST.CARRYOVER
   for (const c of shift) {
     const [lo, hi] = c.order.band;
     let servable = 0;
@@ -637,4 +637,87 @@ test('menu: toppings is the catalogue array for the shelf', async () => {
   const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
   const m = makeMenu(MENU_FIX);
   assert.deepEqual(m.toppings.map((t) => t.id), ['strawberry', 'banana', 'cream']);
+});
+
+/* ---------- toaster.js — one waffle toasting in a slot ---------- */
+
+test('toaster: doneness accumulates at the order rate', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [40, 60], meterRate: 20 });
+  assert.equal(s.status().value, 0);
+  s.tick(1000);
+  assert.ok(Math.abs(s.status().value - 20) < 1e-9);
+  s.tick(500);
+  assert.ok(Math.abs(s.status().value - 30) < 1e-9);
+});
+
+test('toaster: doneness clamps at 100', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [40, 60], meterRate: 20 });
+  s.tick(60_000);
+  assert.equal(s.status().value, 100);
+});
+
+test('toaster: tick is inert once ejected', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [40, 60], meterRate: 20 });
+  s.tick(2000);              // value 40
+  const { settled } = s.eject();
+  s.tick(5000);
+  assert.equal(s.status().value, settled);
+  assert.equal(s.status().settled, settled);
+});
+
+test('toaster: eject settles with the carryover and clamps', async () => {
+  const { makeSlot, CARRYOVER } = await import('../games/waffle-wednesday/toaster.js');
+  const mid = makeSlot({ band: [40, 60], meterRate: 10 });
+  mid.tick(5000);           // value 50
+  assert.equal(mid.eject().settled, 50 + CARRYOVER);
+
+  const hot = makeSlot({ band: [40, 60], meterRate: 10 });
+  hot.tick(9500);           // value 95
+  assert.equal(hot.eject().settled, 100);
+});
+
+test('toaster: eject flags burnt past the hard threshold', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [70, 90], meterRate: 10 });
+  s.tick(8600);             // value 86 -> settled 94 -> >= 92
+  const r = s.eject();
+  assert.equal(r.burnt, true);
+  assert.equal(s.status().phase, 'burnt');
+});
+
+test('toaster: eject flags burnt when it is too far past the band', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [30, 50], meterRate: 10 });
+  s.tick(6000);             // value 60 -> settled 68 -> 68 > 50 + 15
+  assert.equal(s.eject().burnt, true);
+});
+
+test('toaster: a waffle ejected at the band centre is plated, not burnt', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [42, 58], meterRate: 10 });
+  s.tick(4200);             // value 42 -> settled 50, dead centre
+  const r = s.eject();
+  assert.equal(r.burnt, false);
+  assert.equal(s.status().phase, 'plated');
+});
+
+test('toaster: eject is idempotent', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [40, 60], meterRate: 10 });
+  s.tick(5000);
+  const first = s.eject();
+  const second = s.eject();
+  assert.deepEqual(second, first);
+});
+
+test('toaster: status reports phase, value, settled and the band', async () => {
+  const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
+  const s = makeSlot({ band: [40, 60], meterRate: 10 });
+  s.tick(3000);
+  assert.deepEqual(s.status(), { phase: 'toasting', value: 30, settled: null, band: [40, 60] });
+  const { settled } = s.eject();
+  assert.deepEqual(s.status(), { phase: 'plated', value: settled, settled, band: [40, 60] });
 });

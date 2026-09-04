@@ -1,9 +1,10 @@
 import { crewSpriteEl } from './sprites.js';
 import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
-import { isBurnt, scoreServe } from './scoring.js';
-import { rampFor, mulberry32 } from './shift.js';
+import { scoreServe } from './scoring.js';
+import { mulberry32 } from './shift.js';
 import { makeDirector } from './director.js';
 import { makeMenu } from './menu.js';
+import { makeSlot } from './toaster.js';
 import { scatter } from './scatter.js';
 import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
@@ -27,11 +28,9 @@ const state = {
 let director = null;
 const current = () => director.current();
 
-const TOAST = { CARRYOVER: 8, SETTLE_MS: 600 };
-const clampDoneness = (n) => Math.max(0, Math.min(100, n));
-const settle = (raw) => clampDoneness(raw + TOAST.CARRYOVER);
+const TOAST = { SETTLE_MS: 600 };   // marker glide after eject — cosmetic only
 
-let slots = [];   // Slot[]
+let slots = [];   // slot record[]
 
 let plate = { toppings: new Set(), syrupLevel: 0, syrupOverflow: false };
 let pourRaf = 0;
@@ -118,8 +117,11 @@ function showTitle() {
   root.appendChild(wrap);
 }
 
-/* ---------- Toaster slot + doneness meter ---------- */
-function makeSlot() {
+/* ---------- Toaster slot + doneness meter ----------
+   The doneness simulation lives in toaster.js (makeSlot). Here a slot is a
+   record { el, sim, forId, incomingFor, fly } — `sim` is a toaster.makeSlot()
+   instance while a waffle is in it, or null when the slot is empty. */
+function buildSlot() {
   const el = document.createElement('div');
   el.className = 'ww-slot';
   el.dataset.empty = 'true';
@@ -141,98 +143,99 @@ function makeSlot() {
 
   el.append(hint, meter, waffle);
 
-  const slot = {
-    el, meterEl: meter, markerEl: marker, bandEl: band, waffleEl: waffle,
-    value: 0, cooking: false, raf: 0, rate: 14, forCustomerId: null, order: null,
+  const rec = {
+    el, waffleEl: waffle, meterEl: meter, markerEl: marker, bandEl: band, hintEl: hint,
+    sim: null, forId: null, incomingFor: null, fly: null,
   };
-  el.addEventListener('click', () => onSlotClick(slot));
-  return slot;
+  el.addEventListener('click', () => onSlotClick(rec));
+  return rec;
 }
 
-function paintMeter(slot) {
-  const pct = (v) => `${100 - v}%`;                 // 0 at bottom, 100 at top
-  slot.markerEl.style.top = pct(slot.value);
-  if (slot.order) {
-    const [lo, hi] = slot.order.band;
-    slot.bandEl.style.top = pct(hi);
-    slot.bandEl.style.height = `${hi - lo}%`;
+const meterPct = (v) => `${100 - v}%`;   // 0 at the bottom, 100 at the top
+
+function paintSlot(rec) {
+  const st = rec.sim?.status();
+  if (!st) {
+    rec.markerEl.style.top = meterPct(0);
+    rec.waffleEl.style.backgroundImage = 'none';
+    return;
   }
-  // waffle steps through the four doneness frames as it toasts
-  slot.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(slot.value))}")`;
+  rec.markerEl.style.top = meterPct(st.value);
+  const [lo, hi] = st.band;
+  rec.bandEl.style.top = meterPct(hi);
+  rec.bandEl.style.height = `${hi - lo}%`;
+  rec.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(st.value))}")`;
 }
 
-function tick(slot, tPrev) {
+// One rAF loop drives every toasting slot. It steps the sim and repaints; ejected
+// slots hold still (their own settle glide runs in ejectWaffle).
+let toasterRaf = 0;
+function toasterLoop(tPrev) {
   return (tNow) => {
-    if (!slot.cooking) return;
-    const dt = (tNow - tPrev) / 1000;
-    slot.value = clampDoneness(slot.value + slot.rate * dt);
-    paintMeter(slot);
-    if (slot.value >= 100) { slot.value = 100; }
-    slot.raf = requestAnimationFrame(tick(slot, tNow));
+    for (const rec of slots) {
+      if (rec.sim && rec.sim.status().phase === 'toasting') {
+        rec.sim.tick(tNow - tPrev);
+        paintSlot(rec);
+      }
+    }
+    toasterRaf = requestAnimationFrame(toasterLoop(tNow));
   };
 }
+function startToasterLoop() {
+  cancelAnimationFrame(toasterRaf);
+  toasterRaf = requestAnimationFrame(toasterLoop(performance.now()));
+}
+function stopToasterLoop() { cancelAnimationFrame(toasterRaf); }
 
-function dropWaffle(slot, order, customerId) {
-  cancelAnimationFrame(slot.raf);
-  slot.order = order;
-  slot.forCustomerId = customerId;
-  slot.value = 0;
-  slot.rate = order.meterRate ?? rampFor(customerId ?? 1).meterRate;
-  slot.cooking = true;
-  slot.el.dataset.empty = 'false';
-  if (!reduceMotion() && !slot.el.querySelector('.ww-steam')) {
+function dropWaffle(rec, order, customerId) {
+  rec.sim = makeSlot(order);
+  rec.forId = customerId;
+  rec.el.dataset.empty = 'false';
+  if (!reduceMotion() && !rec.el.querySelector('.ww-steam')) {
     const steam = document.createElement('div');
     steam.className = 'ww-steam';
-    slot.el.appendChild(steam);
+    rec.el.appendChild(steam);
   }
-  slot.el.querySelector('.ww-slot-hint').textContent = 'tap to eject';
-  paintMeter(slot);
-  slot.raf = requestAnimationFrame(tick(slot, performance.now()));
+  rec.hintEl.textContent = 'tap to eject';
+  paintSlot(rec);
 }
 
-function ejectWaffle(slot) {
-  slot.cooking = false;
-  cancelAnimationFrame(slot.raf);
-  slot.el.querySelector('.ww-steam')?.remove();
-  const settled = settle(slot.value);
-  const burnt = isBurnt(settled, slot.order.band);
-  // animate marker from current value to settled over SETTLE_MS
-  const from = slot.value;
+// Pull the waffle: the sim settles instantly; the marker glide is cosmetic.
+function ejectWaffle(rec) {
+  const from = rec.sim.status().value;
+  const { settled, burnt } = rec.sim.eject();
+  rec.el.querySelector('.ww-steam')?.remove();
+
   const start = performance.now();
-  return new Promise((resolve) => {
-    const step = (now) => {
-      const k = Math.min(1, (now - start) / TOAST.SETTLE_MS);
-      slot.value = from + (settled - from) * k;
-      paintMeter(slot);
-      if (k < 1) { slot.raf = requestAnimationFrame(step); return; }
-      slot.el.querySelector('.ww-slot-hint').textContent = burnt ? 'burnt!' : 'plated';
-      if (burnt) { slot.el.classList.add('is-burnt'); }
-      resolve({ settled, burnt });
-    };
-    slot.raf = requestAnimationFrame(step);
-  });
+  const glide = (now) => {
+    const k = Math.min(1, (now - start) / TOAST.SETTLE_MS);
+    const shown = from + (settled - from) * k;
+    rec.markerEl.style.top = meterPct(shown);
+    rec.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(shown))}")`;
+    if (k < 1) { requestAnimationFrame(glide); return; }
+    rec.hintEl.textContent = burnt ? 'burnt!' : 'plated';
+    if (burnt) rec.el.classList.add('is-burnt');
+  };
+  requestAnimationFrame(glide);
+
+  return { settled, burnt };
 }
 
-function resetSlot(slot) {
-  slot.cooking = false;
-  cancelAnimationFrame(slot.raf);
-  slot.el.querySelector('.ww-steam')?.remove();
-  if (slot._fly) {                       // a carry-in was still in flight — cancel and refund
-    slot._fly.remove();
-    slot._fly = null;
-    slot._flying = false;
-    slot._flyTarget = null;
+function resetSlot(rec) {
+  rec.sim = null;
+  rec.forId = null;
+  rec.el.querySelector('.ww-steam')?.remove();
+  if (rec.fly) {                       // a carry-in was still in flight — cancel and refund
+    rec.fly.remove();
+    rec.fly = null;
+    rec.incomingFor = null;
     state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
     renderStock();
   }
-  slot.value = 0;
-  slot.order = null;
-  slot.forCustomerId = null;
-  slot.el.dataset.empty = 'true';
-  slot.el.classList.remove('is-burnt', 'is-plated');
-  slot.el.querySelector('.ww-slot-hint').textContent = 'empty';
-  slot._settled = null;
-  slot._burnt = null;
+  rec.el.dataset.empty = 'true';
+  rec.el.classList.remove('is-burnt', 'is-plated');
+  rec.hintEl.textContent = 'empty';
+  paintSlot(rec);
 }
 
 // A transient waffle that carries between the pile, a slot and the plate.
@@ -420,7 +423,7 @@ function resolveStep(step) {
 function showNextCustomer() {
   state.resolving = false;
   for (const s of slots) {
-    if (s.forCustomerId != null && s.forCustomerId < current().id) resetSlot(s);
+    if (s.forId != null && s.forId < current().id) resetSlot(s);
   }
   resetPlate();
   renderCounter();
@@ -440,6 +443,7 @@ function ratingFor(score, kind) {
 
 function endShift(kind) {
   stopPatience();
+  stopToasterLoop();
   clearInterval(state.stockTimer);
   resetPlate();
   slots.forEach(resetSlot);
@@ -509,57 +513,45 @@ function endShift(kind) {
   root.appendChild(card);
 }
 
-function onSlotClick(slot) {
-  if (!slot.cooking) return;
-  ejectWaffle(slot).then(({ settled, burnt }) => {
-    slot._settled = settled;
-    slot._burnt = burnt;
-    if (burnt || reduceMotion()) { paintPlate(); return; }
-    // the toasted waffle arcs onto the plate; the slot's copy dims behind it
-    flyWaffle(slot.waffleEl, root.querySelector('.ww-plate-waffle'), waffleFrameFor(settled), () => {
-      slot.el.classList.add('is-plated');
+function onSlotClick(rec) {
+  if (!rec.sim || rec.sim.status().phase !== 'toasting') return;
+  const { settled, burnt } = ejectWaffle(rec);   // sim settles now; marker glide runs on
+  if (burnt || reduceMotion()) { paintPlate(); return; }
+  // once the marker settles, the toasted waffle arcs onto the plate
+  setTimeout(() => {
+    flyWaffle(rec.waffleEl, root.querySelector('.ww-plate-waffle'), waffleFrameFor(settled), () => {
+      rec.el.classList.add('is-plated');
       paintPlate();
     }, { arc: true });
-  });
+  }, TOAST.SETTLE_MS);
 }
 
 function onStockClick() {
   if (!current()) return;   // shift over — a reaction beat is still playing out
   if (!canSpawn(state.stock)) { say('Out of batter — give it a second.'); return; }
-  const slot = slots.find((s) => s.el.dataset.empty === 'true' && !s._flying);
-  if (!slot) return;   // both toasters occupied
-  const frontId = current().id;
-  // a slot is busy for the front customer from drop, through the settle window
-  // (s.cooking and s._settled both go briefly false mid-eject), to plated —
-  // dataset.empty covers all of that; _flyTarget covers a carry-in still in the air
-  const frontBusy = slots.some((s) =>
-    (s.forCustomerId === frontId && s.el.dataset.empty === 'false') || s._flyTarget === frontId);
-  const target = frontBusy ? director.upcoming(1)[0] : current();
-  if (!target) return;
+  const rec = slots.find((r) => !r.sim && !r.incomingFor);
+  if (!rec) return;   // the toaster is occupied
+  const target = current();
 
   take(state.stock);           // decrement on the tap; resetSlot refunds a cancelled flight
   renderStock();
 
   const land = () => {
-    slot._fly = null;
-    slot._flying = false;
-    slot._flyTarget = null;
+    rec.fly = null;
+    rec.incomingFor = null;
     const cur = current();
     if (!cur || target.id < cur.id) {           // that customer already left — refund
       state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
       renderStock();
       return;
     }
-    dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
-    slot.el.querySelector('.ww-slot-hint').textContent =
-      target.id === frontId ? 'tap to eject' : `for ${target.name}`;
+    dropWaffle(rec, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
   };
 
   if (reduceMotion()) { land(); return; }
-  slot._flying = true;
-  slot._flyTarget = target.id;
-  slot._fly = flyWaffle(root.querySelector('.ww-stock-pile'), slot.el, 'pale', () => {
-    if (slot._fly) land();   // still ours — a reset would have cleared it
+  rec.incomingFor = target.id;
+  rec.fly = flyWaffle(root.querySelector('.ww-stock-pile'), rec.el, 'pale', () => {
+    if (rec.fly) land();   // still ours — a reset would have cleared it
   });
 }
 
@@ -603,8 +595,8 @@ function startShift() {
 
   const toaster = document.createElement('div');
   toaster.className = 'ww-toaster';
-  slots = [makeSlot()];
-  toaster.append(...slots.map((s) => s.el));
+  slots = [buildSlot()];
+  toaster.append(...slots.map((r) => r.el));
   bench.append(toaster);
 
   const serve = document.createElement('button');
@@ -623,6 +615,7 @@ function startShift() {
   renderHud();
   renderStock();
   startStockClock();
+  startToasterLoop();
   startPatience();
   resetPlate();
   paintPlate();
@@ -705,16 +698,16 @@ function serveStamp(result) {
 function onServe() {
   if (state.resolving) return;
   const cur = current();
-  const slot = slots.find((s) => s.forCustomerId === cur.id && s._settled != null)
-    ?? slots.find((s) => s._settled != null);
-  if (!slot) { say('Toast something first.'); return; }
+  const plated = (r) => r.sim && r.sim.status().phase !== 'toasting';
+  const rec = slots.find((r) => r.forId === cur.id && plated(r)) ?? slots.find(plated);
+  if (!rec) { say('Toast something first.'); return; }
 
   state.resolving = true;
   stopPatience();
   root.querySelector('.ww-serve')?.setAttribute('disabled', '');   // no double-serve; shows it registered
 
   const result = scoreServe({
-    doneness: slot._settled,
+    doneness: rec.sim.status().settled,
     band: cur.order.band,
     toppings: [...plate.toppings],
     wanted: cur.order.toppings,
@@ -734,8 +727,7 @@ function onServe() {
     : 'angry';
   say(menu.line(cur, lineKey));
 
-  slot._settled = null;
-  resetSlot(slot);
+  resetSlot(rec);
   resetPlate();
   updateHud();
 
@@ -781,17 +773,17 @@ function renderStationExtras(bench, station) {
 }
 
 function platedSlot() {
-  return slots.find((s) => s._settled != null && !s._burnt);
+  return slots.find((r) => r.sim?.status().phase === 'plated');
 }
 
 function paintPlate() {
   const plateEl = root.querySelector('.ww-plate');
   if (!plateEl) return;
-  const slot = platedSlot();
-  plateEl.dataset.empty = slot ? 'false' : 'true';
+  const rec = platedSlot();
+  plateEl.dataset.empty = rec ? 'false' : 'true';
   const waffle = plateEl.querySelector('.ww-plate-waffle');
-  waffle.style.backgroundImage = slot
-    ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
+  waffle.style.backgroundImage = rec
+    ? `url("${waffleFrameUrl(waffleFrameFor(rec.sim.status().value))}")`
     : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
   const toppings = [...plate.toppings].map((id) => ({ id, emoji: menu.toppingEmoji(id) }));
