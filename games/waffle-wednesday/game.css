@@ -178,7 +178,16 @@
   position: absolute; left: -6px; right: -6px; height: 4px;
   background: var(--ink); box-shadow: 0 0 8px var(--ink);
 }
+.ww-slot.is-plated .ww-waffle { opacity: 0.3; }
 .ww-slot.is-burnt { animation: ww-shudder 0.3s ease; }
+
+.ww-fly {
+  position: fixed; z-index: 60; width: 46px; height: 46px;
+  border-radius: 8px; pointer-events: none;
+  background: center / 100% 100% no-repeat; image-rendering: pixelated;
+  transform: translate(-50%, -50%);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.35, 1);
+}
 @keyframes ww-shudder { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 .ww-slot-new { animation: ww-slot-in 0.4s ease; }
 @keyframes ww-slot-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -432,6 +441,7 @@
   .ww-slot-new { animation: none; }
   .ww-slot.is-burnt, .ww-plate.is-overflow { animation: none; }
   .ww-stock::after { animation: none; }
+  .ww-fly { display: none; }   /* travel is never created under reduced motion, belt and braces */
   /* .ww-say is a persistent bubble now — nothing to disable */
   /* meter marker / waffle colour still update — they are the mechanic */
 }

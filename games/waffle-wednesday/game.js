@@ -211,14 +211,50 @@ function resetSlot(slot) {
   slot.cooking = false;
   cancelAnimationFrame(slot.raf);
   slot.el.querySelector('.ww-steam')?.remove();
+  if (slot._fly) {                       // a carry-in was still in flight — cancel and refund
+    slot._fly.remove();
+    slot._fly = null;
+    slot._flying = false;
+    state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
+    renderStock();
+  }
   slot.value = 0;
   slot.order = null;
   slot.forCustomerId = null;
   slot.el.dataset.empty = 'true';
-  slot.el.classList.remove('is-burnt');
+  slot.el.classList.remove('is-burnt', 'is-plated');
   slot.el.querySelector('.ww-slot-hint').textContent = 'empty';
   slot._settled = null;
   slot._burnt = null;
+}
+
+// A transient waffle that carries between the pile, a slot and the plate.
+// Cosmetic only — the real .ww-waffle / .ww-plate-waffle carry the game state.
+function flyWaffle(fromEl, toEl, frameId, done, opts = {}) {
+  const a = fromEl.getBoundingClientRect();
+  const b = toEl.getBoundingClientRect();
+  const fly = document.createElement('div');
+  fly.className = 'ww-fly';
+  fly.style.backgroundImage = `url("${waffleFrameUrl(frameId)}")`;
+  fly.style.left = `${a.left + a.width / 2}px`;
+  fly.style.top = `${a.top + a.height / 2}px`;
+  document.body.appendChild(fly);
+  const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+  const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  const rot = opts.arc ? ' rotate(9deg)' : '';
+  requestAnimationFrame(() => {
+    fly.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)${rot}`;
+  });
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    fly.remove();
+    done();
+  };
+  fly.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, 900);   // fallback when transitionend is throttled (background tab)
+  return fly;
 }
 
 /* ---------- Ticket + RNG helpers ---------- */
@@ -517,7 +553,12 @@ function onSlotClick(slot) {
   ejectWaffle(slot).then(({ settled, burnt }) => {
     slot._settled = settled;
     slot._burnt = burnt;
-    paintPlate();   // a non-burnt waffle lands on the plate, ready to top
+    if (burnt || reduceMotion()) { paintPlate(); return; }
+    // the toasted waffle arcs onto the plate; the slot's copy dims behind it
+    flyWaffle(slot.waffleEl, root.querySelector('.ww-plate-waffle'), waffleFrameFor(settled), () => {
+      slot.el.classList.add('is-plated');
+      paintPlate();
+    }, { arc: true });
   });
 }
 
@@ -529,10 +570,29 @@ function onStockClick() {
   const frontBusy = slots.some((s) => s.forCustomerId === frontId && (s.cooking || s._settled != null));
   const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
   if (!target) return;
-  take(state.stock);
+
+  take(state.stock);           // decrement on the tap; resetSlot refunds a cancelled flight
   renderStock();
-  dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
-  slot.el.querySelector('.ww-slot-hint').textContent = target.id === frontId ? 'tap to eject' : `for ${target.name}`;
+
+  const land = () => {
+    slot._fly = null;
+    slot._flying = false;
+    const cur = state.shift[state.index];
+    if (!cur || target.id < cur.id) {           // that customer already left — refund
+      state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
+      renderStock();
+      return;
+    }
+    dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
+    slot.el.querySelector('.ww-slot-hint').textContent =
+      target.id === frontId ? 'tap to eject' : `for ${target.name}`;
+  };
+
+  if (reduceMotion()) { land(); return; }
+  slot._flying = true;
+  slot._fly = flyWaffle(root.querySelector('.ww-stock-pile'), slot.el, 'pale', () => {
+    if (slot._fly) land();   // still ours — a reset would have cleared it
+  });
 }
 
 function renderStock() {
