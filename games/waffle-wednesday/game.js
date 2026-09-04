@@ -3,6 +3,7 @@ import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
 import { rampFor, buildShift, mulberry32 } from './shift.js';
 import { makeDirector } from './director.js';
+import { scatter } from './scatter.js';
 import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
 const BEST_KEY = 'waffle-wednesday:best';
@@ -818,44 +819,6 @@ function platedSlot() {
   return slots.find((s) => s._settled != null && !s._burnt);
 }
 
-// Deterministic 0..1 from a string — keeps a topping's jitter stable across the
-// many paintPlate() calls during a syrup pour.
-function hash01(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return (h >>> 0) / 4294967296;
-}
-// How each topping scatters on the waffle: how many pieces, and how big — so a
-// handful of strawberries reads differently from two rashers of bacon.
-const TOPPING_SPREAD = {
-  strawberry: { count: 3, size: 15 },
-  banana:     { count: 3, size: 15 },
-  chocolate:  { count: 3, size: 14 },
-  nuts:       { count: 4, size: 12 },
-  cream:      { count: 1, size: 24 },
-  sprinkles:  { count: 6, size: 10 },
-  cherry:     { count: 1, size: 18 },
-  bacon:      { count: 2, size: 21 },
-};
-// Place piece `i` of `total` across the whole waffle face. A phyllotaxis spiral
-// (golden angle + sqrt radius) spreads points evenly over a disc no matter the
-// count; a per-key jitter keeps it organic, and it's deterministic so pieces
-// hold still across the many paintPlate() calls a syrup pour triggers.
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-function pieceStyle(key, i, total, size) {
-  const ang = i * GOLDEN_ANGLE + (hash01(`${key}a`) - 0.5) * 1.1;
-  const rad = total <= 1
-    ? hash01(`${key}r`) * 9
-    : Math.sqrt((i + 0.5) / total) * 38 + (hash01(`${key}r`) - 0.5) * 7;
-  const rot = (hash01(`${key}t`) - 0.5) * 46;
-  return {
-    left: `${(50 + Math.cos(ang) * rad).toFixed(1)}%`,
-    top: `${(50 + Math.sin(ang) * rad).toFixed(1)}%`,
-    transform: `translate(-50%, -50%) rotate(${rot.toFixed(1)}deg)`,
-    fontSize: `${size}px`,
-  };
-}
-
 function paintPlate() {
   const plateEl = root.querySelector('.ww-plate');
   if (!plateEl) return;
@@ -866,22 +829,19 @@ function paintPlate() {
     ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
     : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
-  const pieces = [];
-  for (const id of plate.toppings) {
-    const emoji = content.toppings.find((t) => t.id === id)?.emoji ?? '';
-    const spread = TOPPING_SPREAD[id] ?? { count: 3, size: 15 };
-    for (let p = 0; p < spread.count; p++) pieces.push({ id, emoji, size: spread.size, key: `${id}:${p}` });
-  }
-  // interleave the pieces so one topping doesn't fall in a single arc of the spiral
-  pieces.sort((a, b) => hash01(a.key) - hash01(b.key));
-  pieces.forEach((pc, i) => {
+  const toppings = [...plate.toppings].map((id) => ({
+    id,
+    emoji: content.toppings.find((t) => t.id === id)?.emoji ?? '',
+  }));
+  for (const pc of scatter(toppings)) {
     const dot = document.createElement('span');
     dot.className = 'ww-plate-topping';
     dot.textContent = pc.emoji;
-    Object.assign(dot.style, pieceStyle(pc.key, i, pieces.length, pc.size));
+    const { left, top, transform, fontSize } = pc;
+    Object.assign(dot.style, { left, top, transform, fontSize });
     dot.addEventListener('click', () => { plate.toppings.delete(pc.id); syncChips(); paintPlate(); });
     waffle.appendChild(dot);
-  });
+  }
   waffle.querySelector('.ww-plate-syrup').style.height = `${plate.syrupLevel}%`;
   root.querySelector('.ww-syrup-gauge-fill').style.width = `${plate.syrupLevel}%`;
   plateEl.classList.toggle('is-overflow', plate.syrupOverflow);

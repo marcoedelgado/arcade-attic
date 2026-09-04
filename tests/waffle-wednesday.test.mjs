@@ -497,3 +497,45 @@ test('current() is null once the shift is over (game.js guards stock taps on thi
   assert.equal(struck.isOver(), true);
   assert.equal(struck.upcoming().length, 0);
 });
+
+/* ---------- scatter.js — deterministic topping layout ---------- */
+
+test('scatter: piece count comes from the per-topping spread', async () => {
+  const { scatter } = await import('../games/waffle-wednesday/scatter.js');
+  assert.equal(scatter([{ id: 'sprinkles', emoji: '*' }]).length, 6);
+  assert.equal(scatter([{ id: 'cherry', emoji: 'o' }]).length, 1);
+  assert.equal(scatter([{ id: 'strawberry', emoji: 's' }, { id: 'bacon', emoji: 'b' }]).length, 5);
+});
+
+test('scatter: an unknown topping falls back to three pieces', async () => {
+  const { scatter } = await import('../games/waffle-wednesday/scatter.js');
+  assert.equal(scatter([{ id: 'marshmallow', emoji: 'm' }]).length, 3);
+});
+
+test('scatter: every piece keeps its id and emoji and lands on the waffle face', async () => {
+  const { scatter } = await import('../games/waffle-wednesday/scatter.js');
+  for (const p of scatter([{ id: 'nuts', emoji: 'N' }])) {
+    assert.equal(p.id, 'nuts');
+    assert.equal(p.emoji, 'N');
+    for (const k of ['left', 'top']) {
+      assert.match(p[k], /^\d+(\.\d+)?%$/);
+      const n = parseFloat(p[k]);
+      assert.ok(n >= 0 && n <= 100, `${k} ${p[k]} is off the face`);
+    }
+    assert.match(p.transform, /^translate\(-50%, -50%\) rotate\(-?\d+(\.\d+)?deg\)$/);
+    assert.match(p.fontSize, /^\d+px$/);
+  }
+});
+
+test('scatter: deterministic — the same toppings give an identical layout', async () => {
+  const { scatter } = await import('../games/waffle-wednesday/scatter.js');
+  const args = [{ id: 'strawberry', emoji: 'S' }, { id: 'cream', emoji: 'C' }];
+  assert.deepEqual(scatter(args), scatter(args));
+});
+
+test('scatter: the input order does not change the layout', async () => {
+  const { scatter } = await import('../games/waffle-wednesday/scatter.js');
+  const ab = scatter([{ id: 'banana', emoji: 'B' }, { id: 'chocolate', emoji: 'K' }]);
+  const ba = scatter([{ id: 'chocolate', emoji: 'K' }, { id: 'banana', emoji: 'B' }]);
+  assert.deepEqual(ab, ba);
+});
