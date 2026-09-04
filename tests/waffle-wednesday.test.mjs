@@ -539,3 +539,96 @@ test('scatter: the input order does not change the layout', async () => {
   const ba = scatter([{ id: 'chocolate', emoji: 'K' }, { id: 'banana', emoji: 'B' }]);
   assert.deepEqual(ab, ba);
 });
+
+/* ---------- menu.js — the content catalogue ---------- */
+
+const MENU_FIX = {
+  crew: {
+    crew: ['marco', 'james', 'nash'].map((id) => ({
+      id,
+      name: id[0].toUpperCase() + id.slice(1),
+      order: { band: [45, 55], toppings: ['strawberry'], syrup: null, ticketText: 'the usual' },
+      lines: { greet: ['oi'], happy: ['ta'], walkout: ['bye'] },
+    })),
+  },
+  customers: {
+    toppings: [
+      { id: 'strawberry', emoji: '🍓', label: 'strawberries' },
+      { id: 'banana', emoji: '🍌', label: 'banana' },
+      { id: 'cream', emoji: '🍦', label: 'cream' },
+    ],
+    names: ['Sam', 'Alex', 'Jo', 'Kai', 'Ree', 'Max', 'Lou', 'Bex', 'Ola', 'Ade'],
+    lines: { greet: ['hello'], happy: ['nice'], meh: ['hmm'], angry: ['grr'], walkout: ['gone'] },
+    donenessVocab: [{ max: 30, word: 'pale' }, { max: 60, word: 'golden' }, { max: 200, word: 'dark' }],
+    syrupChoices: [
+      { target: 50, tolerance: 15, word: 'some syrup' },
+      { target: 95, tolerance: 20, word: 'loads of syrup' },
+    ],
+    roasts: { chefsKiss: ['{who} approves'], solid: ['solid'], rough: ['{walkers} walked'], badWednesday: ['grim'] },
+  },
+};
+
+test('menu: donenessWord buckets by the vocab ceiling, last word past the end', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.equal(m.donenessWord(20), 'pale');
+  assert.equal(m.donenessWord(50), 'golden');
+  assert.equal(m.donenessWord(150), 'dark');
+  assert.equal(m.donenessWord(999), 'dark');
+});
+
+test('menu: toppingLabel / toppingEmoji resolve from the catalogue; id is the label fallback', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.equal(m.toppingLabel('cream'), 'cream');
+  assert.equal(m.toppingLabel('mystery'), 'mystery');
+  assert.equal(m.toppingEmoji('banana'), '🍌');
+  assert.equal(m.toppingEmoji('mystery'), '');
+});
+
+test('menu: syrupWord matches on target, null when the order wants none', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.equal(m.syrupWord(null), null);
+  assert.equal(m.syrupWord({ target: 95 }), 'loads of syrup');
+  assert.equal(m.syrupWord({ target: 7 }), 'some syrup');
+});
+
+test('menu: ticketText composes doneness, toppings and syrup', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.equal(
+    m.ticketText({ band: [40, 60], toppings: ['strawberry', 'banana'], syrup: { target: 50 } }),
+    'golden waffle · strawberries, banana · some syrup',
+  );
+  assert.equal(m.ticketText({ band: [0, 20], toppings: [], syrup: null }), 'pale waffle');
+});
+
+test('menu: line uses a crew member’s own pool, falls back to the shared pool', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.equal(m.line({ kind: 'crew', lines: { greet: ['yo'] } }, 'greet'), 'yo');
+  assert.equal(m.line({ kind: 'generic' }, 'greet'), 'hello');
+});
+
+test('menu: roast fills {who} with a crew name and {walkers} with the list', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.match(m.roast('chefsKiss', []), /^(Marco|James|Nash) approves$/);
+  assert.equal(m.roast('rough', ['Sam', 'Jo']), 'Sam, Jo walked');
+  assert.equal(m.roast('rough', []), 'nobody walked');
+});
+
+test('menu: roster builds a 20-customer shift from the content', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  const shift = m.roster(seeded(4));
+  assert.equal(shift.length, 20);
+  assert.equal(new Set(shift.filter((c) => c.kind === 'crew').map((c) => c.who)).size, 3);
+});
+
+test('menu: toppings is the catalogue array for the shelf', async () => {
+  const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
+  const m = makeMenu(MENU_FIX);
+  assert.deepEqual(m.toppings.map((t) => t.id), ['strawberry', 'banana', 'cream']);
+});

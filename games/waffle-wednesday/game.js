@@ -1,8 +1,9 @@
 import { crewSpriteEl } from './sprites.js';
 import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
-import { rampFor, buildShift, mulberry32 } from './shift.js';
+import { rampFor, mulberry32 } from './shift.js';
 import { makeDirector } from './director.js';
+import { makeMenu } from './menu.js';
 import { scatter } from './scatter.js';
 import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
@@ -12,7 +13,7 @@ const root = document.getElementById('game');
 const reduceMotion = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const content = { crew: [], toppings: [], names: [], lines: {}, donenessVocab: [], syrupChoices: [], roasts: {} };
+let menu = null;   // the content catalogue — set once in main()
 const state = {
   phase: 'title',
   shift: [],
@@ -263,28 +264,6 @@ function flyWaffle(fromEl, toEl, frameId, done, opts = {}) {
   return fly;
 }
 
-/* ---------- Ticket helpers ---------- */
-function donenessWord(target) {
-  for (const v of content.donenessVocab) if (target <= v.max) return v.word;
-  return content.donenessVocab.at(-1).word;
-}
-function toppingLabel(id) {
-  return content.toppings.find((t) => t.id === id)?.label ?? id;
-}
-function syrupWord(syrup) {
-  if (!syrup) return null;
-  const match = content.syrupChoices.find((c) => c.target === syrup.target);
-  return match?.word ?? 'some syrup';
-}
-function ticketText(order) {
-  const centre = (order.band[0] + order.band[1]) / 2;
-  const parts = [`${donenessWord(centre)} waffle`];
-  if (order.toppings.length) parts.push(order.toppings.map(toppingLabel).join(', '));
-  const sw = syrupWord(order.syrup);
-  if (sw) parts.push(sw);
-  return parts.join(' · ');
-}
-
 let sayTimer = 0;
 function say(text, opts = {}) {
   clearTimeout(sayTimer);
@@ -321,13 +300,6 @@ function confetti() {
     p.addEventListener('animationend', () => p.remove(), { once: true });
   }
 }
-function pickLine(customer, key) {
-  const pool = (customer.kind === 'crew' && customer.lines?.[key]?.length)
-    ? customer.lines[key]
-    : (content.lines[key] ?? ['…']);
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 /* ---------- Counter + queue ---------- */
 function faceEl(customer) {
   if (customer.kind === 'crew') return crewSpriteEl(customer.who, 'ww-sprite');
@@ -362,7 +334,7 @@ function renderCounter() {
   ticket.innerHTML = '<h3>Order</h3>';
   const orderLine = document.createElement('span');
   orderLine.className = 'ww-ticket-order';
-  orderLine.textContent = ticketText(cur.order);
+  orderLine.textContent = menu.ticketText(cur.order);
   ticket.append(orderLine);
   if (cur.order.ticketText) {
     const flav = document.createElement('span');
@@ -392,7 +364,7 @@ function renderCounter() {
     f.append(faceEl(nxt));
     const qt = document.createElement('div');
     qt.className = 'ww-queue-ticket';
-    qt.textContent = ticketText(nxt.order);
+    qt.textContent = menu.ticketText(nxt.order);
     f.appendChild(qt);
     rail.appendChild(f);
   });
@@ -432,7 +404,7 @@ function walkout() {
   stopPatience();
   const cur = current();
   const step = director.walkout();
-  say(pickLine(cur, 'walkout'));
+  say(menu.line(cur, 'walkout'));
   slots.forEach(resetSlot);
   resetPlate();
   state.resolving = true;
@@ -452,7 +424,7 @@ function showNextCustomer() {
   }
   resetPlate();
   renderCounter();
-  say(pickLine(current(), 'greet'), { delay: 1800 });
+  say(menu.line(current(), 'greet'), { delay: 1800 });
   updateHud();
   startPatience();
   paintPlate();
@@ -464,13 +436,6 @@ function ratingFor(score, kind) {
   if (score >= 3200) return { key: 'chefsKiss', title: "Chef's kiss" };
   if (score >= 1800) return { key: 'solid', title: 'Solid Wednesday' };
   return { key: 'rough', title: 'Rough Wednesday' };
-}
-
-function fillRoast(tpl, walkers) {
-  const name = content.crew[Math.floor(Math.random() * content.crew.length)].name;
-  return tpl
-    .replaceAll('{who}', name)
-    .replaceAll('{walkers}', walkers.join(', ') || 'nobody');
 }
 
 function endShift(kind) {
@@ -485,8 +450,7 @@ function endShift(kind) {
   const rating = ratingFor(tally.score, kind);
   saveBest({ score: tally.score, rating: rating.title, perfects: tally.perfects, served: tally.served });
 
-  const pool = content.roasts[rating.key] ?? content.roasts.rough;
-  const roast = fillRoast(pool[Math.floor(Math.random() * pool.length)], tally.walkers);
+  const roast = menu.roast(rating.key, tally.walkers);
 
   const looks = {
     chefsKiss:   { cls: 'is-kiss',  emoji: '👌' },
@@ -617,10 +581,7 @@ function startShift() {
   root.classList.remove('ww-bad');
   state.resolving = false;
   state.stock = makeStock();
-  state.shift = buildShift(
-    { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
-    mulberry32(Date.now() >>> 0),
-  );
+  state.shift = menu.roster(mulberry32(Date.now() >>> 0));
   director = makeDirector(state.shift);
   root.replaceChildren();
 
@@ -654,7 +615,7 @@ function startShift() {
   root.appendChild(station);
 
   renderCounter();
-  say(pickLine(current(), 'greet'), { delay: 1800 });
+  say(menu.line(current(), 'greet'), { delay: 1800 });
   renderHud();
   renderStock();
   startStockClock();
@@ -767,7 +728,7 @@ function onServe() {
     : result.verdict === 'good' ? 'happy'
     : result.verdict === 'sloppy' ? 'meh'
     : 'angry';
-  say(pickLine(cur, lineKey));
+  say(menu.line(cur, lineKey));
 
   slot._settled = null;
   resetSlot(slot);
@@ -801,7 +762,7 @@ function renderStationExtras(bench, station) {
 
   const shelf = document.createElement('div');
   shelf.className = 'ww-shelf';
-  for (const t of content.toppings) {
+  for (const t of menu.toppings) {
     const chip = document.createElement('div');
     chip.className = 'ww-chip';
     chip.textContent = t.emoji;
@@ -829,10 +790,7 @@ function paintPlate() {
     ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
     : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
-  const toppings = [...plate.toppings].map((id) => ({
-    id,
-    emoji: content.toppings.find((t) => t.id === id)?.emoji ?? '',
-  }));
+  const toppings = [...plate.toppings].map((id) => ({ id, emoji: menu.toppingEmoji(id) }));
   for (const pc of scatter(toppings)) {
     const dot = document.createElement('span');
     dot.className = 'ww-plate-topping';
@@ -921,17 +879,11 @@ function pourStop() { cancelAnimationFrame(pourRaf); pourRaf = 0; }
 /* ---------- Boot ---------- */
 async function main() {
   try {
-    const [crew, cust] = await Promise.all([
+    const [crew, customers] = await Promise.all([
       fetch('crew.json', { cache: 'no-cache' }).then((r) => r.json()),
       fetch('customers.json', { cache: 'no-cache' }).then((r) => r.json()),
     ]);
-    content.crew = crew.crew;
-    content.toppings = cust.toppings;
-    content.names = cust.names;
-    content.lines = cust.lines;
-    content.donenessVocab = cust.donenessVocab;
-    content.syrupChoices = cust.syrupChoices;
-    content.roasts = cust.roasts;
+    menu = makeMenu({ crew, customers });
   } catch {
     root.textContent = 'Could not load the game.';
     return;
