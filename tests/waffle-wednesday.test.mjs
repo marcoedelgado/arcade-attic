@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isBurnt, scoreServe } from '../games/waffle-wednesday/scoring.js';
 import { rampFor, buildShift, mulberry32 as seeded } from '../games/waffle-wednesday/shift.js';
+import { makeDirector } from '../games/waffle-wednesday/director.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -391,4 +392,95 @@ test('stock: regen adds one per interval, up to the cap, inert when full', async
   regen(s, STOCK_REGEN_MS * 9);         // would overshoot; caps
   assert.equal(s.count, STOCK_MAX);
   assert.equal(s.sinceRegen, 0);        // timer reset at the cap
+});
+
+/* ---------- director.js — the running shift ---------- */
+
+// A stand-in customer roster. The director never inspects an order, only the
+// name and the position, so three bare objects are enough.
+const roster = (n = 3) =>
+  Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `C${i + 1}` }));
+
+const goodServe = { points: 100, tip: 20, perfect: false };
+
+test('makeDirector: starts on the first customer, shift not over', () => {
+  const d = makeDirector(roster());
+  assert.equal(d.current().name, 'C1');
+  assert.equal(d.isOver(), false);
+  assert.deepEqual(d.upcoming(2).map((c) => c.name), ['C2', 'C3']);
+});
+
+test('serve: banks points plus tip and moves to the next customer', () => {
+  const d = makeDirector(roster());
+  const step = d.serve(goodServe);
+  assert.equal(d.stats().score, 120);
+  assert.equal(d.stats().served, 1);
+  assert.equal(d.current().name, 'C2');
+  assert.deepEqual(step, { advancedTo: d.current() });
+});
+
+test('serve: a perfect serve is counted', () => {
+  const d = makeDirector(roster());
+  d.serve({ points: 350, tip: 100, perfect: true });
+  assert.equal(d.stats().perfects, 1);
+});
+
+test('walkout: strike, recorded name, -120, and moves on', () => {
+  const d = makeDirector(roster());
+  const step = d.walkout();
+  const s = d.stats();
+  assert.equal(s.strikes, 1);
+  assert.deepEqual(s.walkers, ['C1']);
+  assert.equal(s.score, -120);
+  assert.deepEqual(step, { advancedTo: d.current() });
+  assert.equal(d.current().name, 'C2');
+});
+
+test('three walkouts end the shift "bad"', () => {
+  const d = makeDirector(roster(10));
+  d.walkout();
+  d.walkout();
+  const step = d.walkout();
+  assert.deepEqual(step, { done: 'bad' });
+  assert.equal(d.isOver(), true);
+});
+
+test('serving the last customer ends the shift "complete"', () => {
+  const d = makeDirector(roster(2));
+  d.serve(goodServe);
+  const step = d.serve(goodServe);
+  assert.deepEqual(step, { done: 'complete' });
+  assert.equal(d.isOver(), true);
+  assert.equal(d.current(), null);
+});
+
+test('stats() returns a fresh snapshot, not a live handle', () => {
+  const d = makeDirector(roster());
+  const snap = d.stats();
+  snap.score = 9999;
+  snap.walkers.push('hacker');
+  assert.equal(d.stats().score, 0);
+  assert.deepEqual(d.stats().walkers, []);
+});
+
+test('a full 20-customer shift runs to "complete" with no DOM', () => {
+  const { crew } = readJson('../games/waffle-wednesday/crew.json');
+  const cust = readJson('../games/waffle-wednesday/customers.json');
+  const customers = buildShift(
+    { crew, toppings: cust.toppings, names: cust.names, syrupChoices: cust.syrupChoices },
+    seeded(123),
+  );
+  const d = makeDirector(customers);
+  let steps = 0;
+  let last;
+  while (!d.isOver()) {
+    last = d.serve({ points: 200, tip: 50, perfect: true });
+    steps += 1;
+  }
+  assert.equal(steps, 20);
+  assert.deepEqual(last, { done: 'complete' });
+  const s = d.stats();
+  assert.equal(s.served, 20);
+  assert.equal(s.strikes, 0);
+  assert.equal(s.score, 20 * 250);
 });
