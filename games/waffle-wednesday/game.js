@@ -787,11 +787,13 @@ function renderStationExtras(bench, station) {
 
   const syrup = document.createElement('div');
   syrup.className = 'ww-syrup';
-  syrup.innerHTML = '🍯<div class="ww-syrup-gauge"><div class="ww-syrup-gauge-fill"></div></div>';
+  syrup.innerHTML = '<span class="ww-syrup-bottle" aria-hidden="true">🍯</span>'
+    + '<div class="ww-syrup-gauge"><div class="ww-syrup-gauge-fill"></div></div>';
   syrup.addEventListener('pointerdown', (e) => { e.preventDefault(); pourStart(); });
   syrup.addEventListener('pointerup', pourStop);
   syrup.addEventListener('pointercancel', pourStop);
   syrup.addEventListener('pointerleave', pourStop);
+  syrup.addEventListener('contextmenu', (e) => e.preventDefault());   // no press-and-hold menu on the bottle
 
   area.append(syrup, plateEl);
 

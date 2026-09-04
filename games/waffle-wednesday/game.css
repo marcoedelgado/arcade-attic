@@ -29,7 +29,10 @@
   box-shadow: var(--shadow);
   color: var(--ink);
   user-select: none;
-  touch-action: manipulation;
+  -webkit-user-select: none;
+  touch-action: none;               /* a drag that misses a chip must not pan/scroll the page */
+  overscroll-behavior: contain;
+  -webkit-touch-callout: none;      /* no "Copy" callout when you press-and-hold an emoji */
   font-family: var(--font-body);
 }
 
@@ -379,8 +382,10 @@
 
 .ww-syrup {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  font-size: 26px; cursor: pointer; touch-action: none; user-select: none;
+  font-size: 26px; cursor: pointer; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
+.ww-syrup-bottle { pointer-events: none; }
 .ww-syrup-gauge { width: 46px; height: 8px; border-radius: 4px; background: rgba(0,0,0,0.25); overflow: hidden; }
 .ww-syrup-gauge-fill { height: 100%; width: 0%; background: #b5651d; }
 
