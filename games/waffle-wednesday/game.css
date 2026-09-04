@@ -208,15 +208,23 @@
 .ww-hud {
   position: absolute; left: 0; right: 0; top: 0;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 12px; font-size: 12px;
-  background: rgba(4,2,14,0.55); color: var(--ink);
+  padding: 8px 12px; font-size: 10px; line-height: 1;
+  background: rgb(var(--ww-scrim) / 0.55); color: var(--ink);
   font-family: var(--font-display);
+  border-bottom: 2px solid rgba(74,63,122,0.6);
   z-index: 5;
 }
-.ww-hud .ww-strikes span { opacity: 0.35; }
-.ww-hud .ww-strikes span.is-lit { opacity: 1; color: var(--neon-pink); }
-.ww-counter { top: 30px; }          /* clear the HUD */
-.ww-queue { top: 122px; }
+.ww-hud .ww-hud-score { color: var(--neon); }
+.ww-hud .ww-strikes { display: flex; gap: 4px; align-items: center; }
+.ww-hud .ww-strikes span {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ink); opacity: 0.22;
+}
+.ww-hud .ww-strikes span.is-lit {
+  opacity: 1; background: var(--neon-pink); box-shadow: 0 0 6px var(--neon-pink);
+}
+.ww-counter { top: 34px; }          /* clear the HUD */
+.ww-queue { top: 126px; }
 
 /* ---------- Verdict flash ---------- */
 .ww.flash-perfect { animation: ww-flash 0.5s ease; --flash: var(--neon); }

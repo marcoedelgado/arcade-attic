@@ -520,7 +520,7 @@ function renderHud() {
 function updateHud() {
   const hud = root.querySelector('.ww-hud');
   if (!hud) return;
-  hud.querySelector('.ww-hud-cust').textContent = `Cust ${Math.min(state.index + 1, 20)}/20`;
+  hud.querySelector('.ww-hud-cust').textContent = `Customers ${Math.min(state.index + 1, 20)}/20`;
   hud.querySelector('.ww-hud-score').textContent = `${state.score.toLocaleString()}`;
   hud.querySelectorAll('.ww-strikes span').forEach((s, i) => s.classList.toggle('is-lit', i < state.strikes));
 }
