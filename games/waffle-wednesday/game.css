@@ -257,19 +257,50 @@
 
 /* ---------- Report card ---------- */
 .ww-report {
-  position: absolute; inset: 0;
+  position: absolute; inset: 0; z-index: 3;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; text-align: center; padding: 24px;
-  background: rgba(4,2,14,0.72);
+  gap: 15px; text-align: center; padding: 26px;
+  background: rgb(var(--ww-scrim) / 0.72);
+  --stat: var(--neon); --stat-rgb: 255 211 77;
 }
-.ww-report h2 { font-family: var(--font-display); color: var(--neon); font-size: clamp(15px, 4.5vw, 22px); margin: 0; }
-.ww-report .ww-report-score { font-size: 28px; font-weight: 700; }
-.ww-report .ww-report-roast { font-style: italic; color: var(--ink-dim); max-width: 32ch; }
-.ww-report .ww-report-stats { display: flex; gap: 18px; font-size: 12px; color: var(--ink-dim); }
-.ww-report .ww-report-stats b { display: block; font-size: 18px; color: var(--ink); }
-.ww-report-actions { display: flex; gap: 10px; }
+.ww-report.is-solid { --stat: var(--neon-green); --stat-rgb: 61 220 151; }
+.ww-report.is-rough { --stat: var(--neon-blue);  --stat-rgb: 111 179 255; }
+.ww-report.is-bad   { background: rgb(28 4 14 / 0.82); }
+.ww.ww-bad { border-color: var(--neon-pink); }
+
+.ww-report-crest { font-size: 34px; line-height: 1; display: flex; gap: 6px; }
+.ww-report-crest span {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--neon-pink); box-shadow: 0 0 7px var(--neon-pink);
+}
+
+.ww-report h2 {
+  font-family: var(--font-display); font-size: clamp(16px, 4.5vw, 18px); line-height: 1.6;
+  margin: 0; color: var(--neon); text-shadow: 3px 3px 0 var(--attic-deep);
+}
+.ww-report.is-solid h2 { color: var(--neon-green); }
+.ww-report.is-rough h2 { color: var(--neon-blue); }
+.ww-report.is-bad   h2 { color: var(--neon-pink); }
+
+.ww-report .ww-report-score { font-family: var(--font-display); font-size: 26px; color: var(--ink); }
+.ww-report .ww-report-roast { font-style: italic; font-size: 13px; line-height: 1.55; color: var(--ink-dim); max-width: 30ch; }
+
+.ww-report-stats { display: flex; gap: 10px; width: 100%; max-width: 300px; }
+.ww-report-stats > div { flex: 1; padding: 9px 4px; border: 2px solid var(--edge); border-radius: 6px; }
+.ww-report-stats > div.is-lit { border-color: var(--stat); background: rgb(var(--stat-rgb) / 0.1); }
+.ww-report-stats > div.is-lit:last-child { --stat: var(--neon-pink); --stat-rgb: 255 93 115; }
+.ww-report-stats b { display: block; font-family: var(--font-display); font-size: 15px; color: var(--ink); }
+.ww-report-stats .is-lit b { color: var(--stat); }
+.ww-report-stats span { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-dim); }
+
+.ww-report-actions { display: flex; gap: 10px; width: 100%; max-width: 300px; }
 .ww-report-actions a { text-decoration: none; }
+.ww-report-actions .aa-btn {
+  flex: 1; font-family: var(--font-display); font-size: 10px; line-height: 1.5;
+  padding: 12px 4px; border: 3px solid var(--attic-deep); border-radius: 8px; text-align: center;
+}
 .ww-report-new { color: var(--attic-deep); }
+.ww-report-home { color: var(--ink); background: var(--panel-bright); }
 
 /* ---------- Steam ---------- */
 .ww-steam {

@@ -431,18 +431,45 @@ function endShift(kind) {
   const pool = content.roasts[rating.key] ?? content.roasts.rough;
   const roast = fillRoast(pool[Math.floor(Math.random() * pool.length)]);
 
+  const looks = {
+    chefsKiss:   { cls: 'is-kiss',  emoji: '👌' },
+    solid:       { cls: 'is-solid', emoji: '🧇' },
+    rough:       { cls: 'is-rough', emoji: '😕' },
+    badWednesday:{ cls: 'is-bad',   emoji: null },
+  }[rating.key] ?? { cls: 'is-rough', emoji: '😕' };
+  const highlight = state.strikes > 0 ? 'walked' : 'perfect';
+
   root.replaceChildren();
+  root.classList.toggle('ww-bad', rating.key === 'badWednesday');
+  if (rating.key === 'chefsKiss') confetti();
+
   const card = document.createElement('div');
-  card.className = 'ww-report';
-  card.innerHTML = `
-    <h2>${rating.title}</h2>
-    <div class="ww-report-score">${state.score.toLocaleString()}</div>
-    <p class="ww-report-roast">${roast}</p>
-    <div class="ww-report-stats">
-      <div><b>${state.perfects}</b> perfect</div>
-      <div><b>${state.served}</b> served</div>
-      <div><b>${state.strikes}</b> walked</div>
-    </div>`;
+  card.className = `ww-report ${looks.cls}`;
+
+  const crest = document.createElement('div');
+  crest.className = 'ww-report-crest';
+  if (looks.emoji) crest.textContent = looks.emoji;
+  else crest.innerHTML = '<span></span><span></span><span></span>';
+
+  const h2 = document.createElement('h2');
+  h2.innerHTML = rating.title.replace(' ', '<br>');
+
+  const score = document.createElement('div');
+  score.className = 'ww-report-score';
+  score.textContent = state.score.toLocaleString();
+
+  const roastEl = document.createElement('p');
+  roastEl.className = 'ww-report-roast';
+  roastEl.textContent = roast;
+
+  const stats = document.createElement('div');
+  stats.className = 'ww-report-stats';
+  for (const [label, n] of [['perfect', state.perfects], ['served', state.served], ['walked', state.strikes]]) {
+    const cell = document.createElement('div');
+    if (label === highlight) cell.className = 'is-lit';
+    cell.innerHTML = `<b>${n}</b><span>${label}</span>`;
+    stats.appendChild(cell);
+  }
 
   const actions = document.createElement('div');
   actions.className = 'ww-report-actions';
@@ -452,14 +479,13 @@ function endShift(kind) {
   again.textContent = 'New shift';
   again.addEventListener('click', () => startShift());
   const home = document.createElement('a');
-  home.className = 'aa-btn';
+  home.className = 'aa-btn ww-report-home';
   home.href = '../../';
-  home.textContent = '← The Attic';
+  home.textContent = '← Attic';
   actions.append(again, home);
-  card.appendChild(actions);
-  root.appendChild(card);
 
-  if (rating.key === 'chefsKiss') confetti();
+  card.append(crest, h2, score, roastEl, stats, actions);
+  root.appendChild(card);
 }
 
 function onSlotClick(slot) {
@@ -477,6 +503,7 @@ function onSlotClick(slot) {
 
 function startShift() {
   state.phase = 'shift';
+  root.classList.remove('ww-bad');
   Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [], resolving: false });
   state.shift = buildShift(
     { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
