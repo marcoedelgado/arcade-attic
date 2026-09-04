@@ -255,13 +255,15 @@ function ticketText(order) {
 }
 
 function say(text) {
-  root.querySelector('.ww-say')?.remove();
-  const el = document.createElement('div');
-  el.className = 'ww-say';
+  // A persistent bubble anchored near the portrait: replaced on the next line,
+  // never fades, so it reads the same with animation off.
+  let el = root.querySelector('.ww-say');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'ww-say';
+    root.appendChild(el);
+  }
   el.textContent = text;
-  root.appendChild(el);
-  if (reduceMotion()) setTimeout(() => el.remove(), 1600);
-  else el.addEventListener('animationend', () => el.remove(), { once: true });
 }
 
 function confetti() {
