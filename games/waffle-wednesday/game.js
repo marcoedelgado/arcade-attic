@@ -517,7 +517,11 @@ function endShift(kind) {
 }
 
 function onSlotClick(rec) {
-  if (!rec.sim || rec.sim.status().phase !== 'toasting') return;
+  if (!rec.sim) return;
+  const phase = rec.sim.status().phase;
+  if (phase === 'burnt') { resetSlot(rec); return; }   // bin it — free up the slot for a fresh one
+  if (phase !== 'toasting') return;                    // already plated, waiting to be served
+
   const { settled, burnt } = ejectWaffle(rec);   // sim settles now; marker glide runs on
   if (burnt || reduceMotion()) { paintPlate(); return; }
   // once the marker settles, the toasted waffle arcs onto the plate
