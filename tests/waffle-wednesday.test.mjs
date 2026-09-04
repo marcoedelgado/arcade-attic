@@ -611,12 +611,18 @@ test('menu: line uses a crew member’s own pool, falls back to the shared pool'
   assert.equal(m.line({ kind: 'generic' }, 'greet'), 'hello');
 });
 
-test('menu: roast fills {who} with a crew name and {walkers} with the list', async () => {
+test('menu: roast returns the filled line and the crew id delivering it', async () => {
   const { makeMenu } = await import('../games/waffle-wednesday/menu.js');
   const m = makeMenu(MENU_FIX);
-  assert.match(m.roast('chefsKiss', []), /^(Marco|James|Nash) approves$/);
-  assert.equal(m.roast('rough', ['Sam', 'Jo']), 'Sam, Jo walked');
-  assert.equal(m.roast('rough', []), 'nobody walked');
+
+  const kiss = m.roast('chefsKiss', []);
+  assert.match(kiss.text, /^(Marco|James|Nash) approves$/);
+  assert.ok(['marco', 'james', 'nash'].includes(kiss.who));
+  // the portrait matches the name in the line: {who} was filled from the same member
+  assert.equal(kiss.text.split(' ')[0].toLowerCase(), kiss.who);
+
+  assert.equal(m.roast('rough', ['Sam', 'Jo']).text, 'Sam, Jo walked');
+  assert.equal(m.roast('rough', []).text, 'nobody walked');
 });
 
 test('menu: roster builds a 20-customer shift from the content', async () => {

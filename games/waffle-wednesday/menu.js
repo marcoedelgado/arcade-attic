@@ -55,12 +55,14 @@ export function makeMenu(data) {
       return pick(pool);
     },
 
-    // the end-of-shift roast for a rating, with {who}/{walkers} filled in
+    // the end-of-shift roast for a rating: the filled line plus the crew id who
+    // delivers it (their portrait shows on the report card).
     roast(ratingKey, walkers) {
-      const pool = c.roasts[ratingKey] ?? c.roasts.rough;
-      return pick(pool)
-        .replaceAll('{who}', pick(crew).name)
+      const speaker = pick(crew);
+      const text = pick(c.roasts[ratingKey] ?? c.roasts.rough)
+        .replaceAll('{who}', speaker.name)
         .replaceAll('{walkers}', walkers.join(', ') || 'nobody');
+      return { text, who: speaker.id };
     },
   };
 }

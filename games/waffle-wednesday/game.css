@@ -445,7 +445,18 @@
 .ww-report.is-bad   h2 { color: var(--neon-pink); }
 
 .ww-report .ww-report-score { font-family: var(--font-display); font-size: 26px; color: var(--ink); }
-.ww-report .ww-report-roast { font-style: italic; font-size: 13px; line-height: 1.55; color: var(--ink-dim); max-width: 30ch; }
+.ww-report .ww-report-roast {
+  display: flex; align-items: center; gap: 11px;
+  max-width: 34ch; text-align: left;
+}
+.ww-report .ww-report-roast p {
+  margin: 0; font-style: italic; font-size: 13px; line-height: 1.55; color: var(--ink-dim);
+}
+.ww-report-face {
+  flex-shrink: 0; width: 46px; height: 46px;
+  image-rendering: pixelated; border-radius: 5px;
+  border: 2px solid var(--edge); box-shadow: 3px 3px 0 var(--attic-deep);
+}
 
 .ww-report-stats { display: flex; gap: 10px; width: 100%; max-width: 300px; }
 .ww-report-stats > div { flex: 1; padding: 9px 4px; border: 2px solid var(--edge); border-radius: 6px; }

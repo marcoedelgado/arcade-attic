@@ -450,7 +450,7 @@ function endShift(kind) {
   const rating = ratingFor(tally.score, kind);
   saveBest({ score: tally.score, rating: rating.title, perfects: tally.perfects, served: tally.served });
 
-  const roast = menu.roast(rating.key, tally.walkers);
+  const roast = menu.roast(rating.key, tally.walkers);   // { text, who }
 
   const looks = {
     chefsKiss:   { cls: 'is-kiss',  emoji: '👌' },
@@ -479,9 +479,13 @@ function endShift(kind) {
   score.className = 'ww-report-score';
   score.textContent = tally.score.toLocaleString();
 
-  const roastEl = document.createElement('p');
+  const roastEl = document.createElement('div');
   roastEl.className = 'ww-report-roast';
-  roastEl.textContent = roast;
+  const roastFace = crewSpriteEl(roast.who, 'ww-report-face');
+  roastFace.alt = '';   // decorative — the line names the speaker
+  const roastLine = document.createElement('p');
+  roastLine.textContent = roast.text;
+  roastEl.append(roastFace, roastLine);
 
   const stats = document.createElement('div');
   stats.className = 'ww-report-stats';
