@@ -333,18 +333,26 @@ function renderCounter() {
 
   const queue = document.createElement('div');
   queue.className = 'ww-queue';
+  const label = document.createElement('div');
+  label.className = 'ww-queue-label';
+  label.textContent = 'NEXT UP';
+  queue.appendChild(label);
+  const rail = document.createElement('div');
+  rail.className = 'ww-queue-rail';
   for (let i = 1; i <= 3; i++) {
     const nxt = state.shift[state.index + i];
     if (!nxt) break;
     const f = document.createElement('div');
     f.className = 'ww-queue-face';
+    f.style.setProperty('--depth', [0.78, 0.62, 0.5][i - 1]);
     f.append(faceEl(nxt, true));
     const qt = document.createElement('div');
     qt.className = 'ww-queue-ticket';
     qt.textContent = ticketText(nxt.order);
     f.appendChild(qt);
-    queue.appendChild(f);
+    rail.appendChild(f);
   }
+  queue.appendChild(rail);
   root.appendChild(queue);
 }
 
