@@ -1,4 +1,5 @@
 import { crewSpriteEl } from './sprites.js';
+import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
 import { rampFor, buildShift } from './shift.js';
 
@@ -148,12 +149,8 @@ function paintMeter(slot) {
     slot.bandEl.style.top = pct(hi);
     slot.bandEl.style.height = `${hi - lo}%`;
   }
-  // waffle colour tracks doneness: pale -> golden -> dark
-  const v = slot.value;
-  const col = v < 50
-    ? `hsl(41 55% ${88 - v * 0.5}%)`
-    : `hsl(${Math.max(18, 41 - (v - 50) * 0.5)} ${55 + (v - 50) * 0.4}% ${63 - (v - 50) * 0.6}%)`;
-  slot.waffleEl.style.setProperty('--waffle-color', col);
+  // waffle steps through the four doneness frames as it toasts
+  slot.waffleEl.style.backgroundImage = `url("${waffleFrameUrl(waffleFrameFor(slot.value))}")`;
 }
 
 function tick(slot, tPrev) {
@@ -521,7 +518,11 @@ function onSlotClick(slot) {
     dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
     slot.el.querySelector('.ww-slot-hint').textContent = target.id === frontId ? 'tap to eject' : `for ${target.name}`;
   } else if (slot.cooking) {
-    ejectWaffle(slot).then(({ settled, burnt }) => { slot._settled = settled; slot._burnt = burnt; });
+    ejectWaffle(slot).then(({ settled, burnt }) => {
+      slot._settled = settled;
+      slot._burnt = burnt;
+      paintPlate();   // a non-burnt waffle lands on the plate, ready to top
+    });
   }
 }
 
@@ -688,9 +689,10 @@ function paintPlate() {
   if (!plateEl) return;
   const slot = platedSlot();
   plateEl.dataset.empty = slot ? 'false' : 'true';
-  if (slot) plateEl.querySelector('.ww-plate-waffle').style.setProperty('--plated-color', slot.waffleEl.style.getPropertyValue('--waffle-color'));
-
   const waffle = plateEl.querySelector('.ww-plate-waffle');
+  waffle.style.backgroundImage = slot
+    ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
+    : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
   let i = 0;
   for (const id of plate.toppings) {

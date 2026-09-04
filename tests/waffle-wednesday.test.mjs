@@ -301,3 +301,24 @@ test('crew-sprites.js: six well-formed 28x28 indexed sprites', async () => {
     }
   }
 });
+
+test('waffle-sprite.js: four doneness frames, one 12x12 map, well-formed palettes', async () => {
+  const { WAFFLE_FRAMES } = await import('../games/waffle-wednesday/waffle-sprite.js');
+  assert.deepEqual(WAFFLE_FRAMES.map((f) => f.id), ['pale', 'just', 'golden', 'charcoal']);
+  for (const f of WAFFLE_FRAMES) {
+    assert.equal(f.palette.length, 4, `${f.id} palette length`);
+    assert.equal(f.palette[0], null, `${f.id} index 0 is transparent`);
+    for (const hex of f.palette.slice(1)) {
+      assert.ok(/^#[0-9a-f]{6}$/i.test(hex), `${f.id} palette hex ${hex}`);
+    }
+  }
+});
+
+test('waffleFrameFor: buckets doneness into the four frames in order', async () => {
+  const { waffleFrameFor } = await import('../games/waffle-wednesday/waffle-sprite.js');
+  const boundaries = [
+    [0, 'pale'], [33, 'pale'], [34, 'just'], [47, 'just'],
+    [48, 'golden'], [84, 'golden'], [85, 'charcoal'], [100, 'charcoal'],
+  ];
+  for (const [v, id] of boundaries) assert.equal(waffleFrameFor(v), id, `v${v}`);
+});

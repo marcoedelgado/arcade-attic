@@ -118,12 +118,9 @@
 }
 .ww-waffle {
   width: 62%; aspect-ratio: 1; margin-bottom: 14px;
-  border-radius: 8px;
-  background:
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
-    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
-    var(--waffle-color, #e8c98f);
-  transition: background-color 0.1s linear;
+  border-radius: 8px; overflow: hidden;
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
 }
 .ww-meter {
   position: absolute; right: 6px; top: 10px; bottom: 10px; width: 12px;
@@ -254,12 +251,11 @@
   display: flex; align-items: center; justify-content: center;
 }
 .ww-plate[data-empty="true"] { opacity: 0.4; }
+.ww-plate[data-empty="true"] .ww-plate-waffle { border: 2px dashed rgba(23,18,43,0.4); }
 .ww-plate-waffle {
   width: 66%; aspect-ratio: 1; border-radius: 8px;
-  background:
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
-    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 4px, transparent 4px 10px),
-    var(--plated-color, #e8c98f);
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
   position: relative;
 }
 .ww-plate-topping { position: absolute; font-size: 18px; transform: translate(-50%, -50%); cursor: pointer; }
