@@ -813,15 +813,20 @@ const TOPPING_SPREAD = {
   cherry:     { count: 1, size: 18 },
   bacon:      { count: 2, size: 21 },
 };
-// One piece's placement — polar from the waffle centre, deterministic per key so
-// pieces hold still across the many paintPlate() calls a syrup pour triggers.
-function pieceStyle(id, key, size) {
-  const ang = hash01(`${key}a`) * Math.PI * 2;
-  const rad = 6 + hash01(`${key}r`) * 30;     // % from centre
-  const rot = (hash01(`${key}t`) - 0.5) * 44; // ±22deg
+// Place piece `i` of `total` across the whole waffle face. A phyllotaxis spiral
+// (golden angle + sqrt radius) spreads points evenly over a disc no matter the
+// count; a per-key jitter keeps it organic, and it's deterministic so pieces
+// hold still across the many paintPlate() calls a syrup pour triggers.
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+function pieceStyle(key, i, total, size) {
+  const ang = i * GOLDEN_ANGLE + (hash01(`${key}a`) - 0.5) * 1.1;
+  const rad = total <= 1
+    ? hash01(`${key}r`) * 9
+    : Math.sqrt((i + 0.5) / total) * 38 + (hash01(`${key}r`) - 0.5) * 7;
+  const rot = (hash01(`${key}t`) - 0.5) * 46;
   return {
-    left: `${50 + Math.cos(ang) * rad}%`,
-    top: `${50 + Math.sin(ang) * rad}%`,
+    left: `${(50 + Math.cos(ang) * rad).toFixed(1)}%`,
+    top: `${(50 + Math.sin(ang) * rad).toFixed(1)}%`,
     transform: `translate(-50%, -50%) rotate(${rot.toFixed(1)}deg)`,
     fontSize: `${size}px`,
   };
@@ -837,18 +842,22 @@ function paintPlate() {
     ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
     : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
+  const pieces = [];
   for (const id of plate.toppings) {
     const emoji = content.toppings.find((t) => t.id === id)?.emoji ?? '';
     const spread = TOPPING_SPREAD[id] ?? { count: 3, size: 15 };
-    for (let p = 0; p < spread.count; p++) {
-      const dot = document.createElement('span');
-      dot.className = 'ww-plate-topping';
-      dot.textContent = emoji;
-      Object.assign(dot.style, pieceStyle(id, `${id}:${p}`, spread.size));
-      dot.addEventListener('click', () => { plate.toppings.delete(id); syncChips(); paintPlate(); });
-      waffle.appendChild(dot);
-    }
+    for (let p = 0; p < spread.count; p++) pieces.push({ id, emoji, size: spread.size, key: `${id}:${p}` });
   }
+  // interleave the pieces so one topping doesn't fall in a single arc of the spiral
+  pieces.sort((a, b) => hash01(a.key) - hash01(b.key));
+  pieces.forEach((pc, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'ww-plate-topping';
+    dot.textContent = pc.emoji;
+    Object.assign(dot.style, pieceStyle(pc.key, i, pieces.length, pc.size));
+    dot.addEventListener('click', () => { plate.toppings.delete(pc.id); syncChips(); paintPlate(); });
+    waffle.appendChild(dot);
+  });
   waffle.querySelector('.ww-plate-syrup').style.height = `${plate.syrupLevel}%`;
   root.querySelector('.ww-syrup-gauge-fill').style.width = `${plate.syrupLevel}%`;
   plateEl.classList.toggle('is-overflow', plate.syrupOverflow);
