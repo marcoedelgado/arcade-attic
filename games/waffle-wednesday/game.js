@@ -535,18 +535,24 @@ function startShift() {
 
   const station = document.createElement('div');
   station.className = 'ww-station';
+
+  const bench = document.createElement('div');
+  bench.className = 'ww-bench';
   const toaster = document.createElement('div');
   toaster.className = 'ww-toaster';
   slots = [makeSlot()];
   toaster.append(...slots.map((s) => s.el));
+  bench.append(toaster);
 
   const serve = document.createElement('button');
   serve.type = 'button';
-  serve.className = 'aa-btn';
+  serve.className = 'aa-btn ww-serve';
   serve.textContent = 'SERVE';
   serve.addEventListener('click', onServe);
-  station.append(toaster, serve);
-  renderStationExtras(station);
+
+  station.append(bench);
+  renderStationExtras(bench, station);   // plate-area -> bench, shelf -> station
+  station.append(serve);
   root.appendChild(station);
 
   renderCounter();
@@ -636,7 +642,7 @@ function onServe() {
 }
 
 /* ---------- Plating ---------- */
-function renderStationExtras(station) {
+function renderStationExtras(bench, station) {
   const area = document.createElement('div');
   area.className = 'ww-plate-area';
 
@@ -667,7 +673,8 @@ function renderStationExtras(station) {
     shelf.appendChild(chip);
   }
 
-  station.append(area, shelf);
+  bench.append(area);
+  station.append(shelf);
 }
 
 function platedSlot() {
@@ -699,8 +706,10 @@ function paintPlate() {
 }
 
 function syncChips() {
+  const wanted = new Set(state.shift[state.index]?.order.toppings ?? []);
   root.querySelectorAll('.ww-chip').forEach((c) => {
     c.classList.toggle('is-on', plate.toppings.has(c.dataset.topping));
+    c.classList.toggle('is-wanted', wanted.has(c.dataset.topping) && !plate.toppings.has(c.dataset.topping));
   });
 }
 
