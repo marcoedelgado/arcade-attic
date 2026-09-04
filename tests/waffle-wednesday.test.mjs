@@ -701,28 +701,28 @@ test('toaster: status reports phase, value, settled and the band', async () => {
   assert.deepEqual(s.status(), { phase: 'plated', value: settled, settled, band: [40, 60] });
 });
 
-test('toaster: a waffle left in the slot burns in place', async () => {
+test('toaster: a waffle left until the meter tops out burns in place', async () => {
   const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
-  const s = makeSlot({ band: [40, 60], meterRate: 20 });
-  s.tick(3600);                              // value 72 — still under band + 15
+  const s = makeSlot({ band: [20, 35], meterRate: 20 });   // pale order — burns late on eject, not here
+  s.tick(3000);                             // value 60 — well past the band, still just toasting
   assert.equal(s.status().phase, 'toasting');
-  s.tick(400);                               // value 80 — now past it
+  s.tick(2000);                             // value 100 — meter topped out
   assert.equal(s.status().phase, 'burnt');
-  assert.equal(s.status().settled, 80);      // frozen where it crossed, no extra carryover
+  assert.equal(s.status().settled, 100);
 });
 
 test('toaster: ticking a burnt-in-slot waffle does nothing more', async () => {
   const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
   const s = makeSlot({ band: [40, 60], meterRate: 20 });
-  s.tick(4000);
+  s.tick(6000);
   assert.equal(s.status().phase, 'burnt');
   s.tick(9000);
-  assert.equal(s.status().value, 80);
+  assert.equal(s.status().value, 100);
 });
 
 test('toaster: ejecting an already-burnt slot returns the burnt result', async () => {
   const { makeSlot } = await import('../games/waffle-wednesday/toaster.js');
   const s = makeSlot({ band: [40, 60], meterRate: 20 });
-  s.tick(4000);
-  assert.deepEqual(s.eject(), { settled: 80, burnt: true });
+  s.tick(6000);
+  assert.deepEqual(s.eject(), { settled: 100, burnt: true });
 });

@@ -21,13 +21,14 @@ export function makeSlot(order) {
   let settled = null;
 
   return {
-    // advance the toast by dtMs of cooking; inert once ejected. A waffle left in
-    // long enough burns in the slot on its own — no eject needed.
+    // advance the toast by dtMs of cooking; inert once ejected. A waffle left
+    // until the meter tops out burns in the slot on its own — no eject needed.
+    // (Ejecting well past the band still burns it; that's eject()'s job.)
     tick(dtMs) {
       if (phase !== 'toasting') return;
       value = clamp(value + rate * (dtMs / 1000));
-      if (isBurnt(value, order.band)) {
-        settled = value;   // frozen where it crossed — the eject carryover never applies
+      if (value >= 100) {
+        settled = 100;
         phase = 'burnt';
       }
     },
