@@ -108,13 +108,15 @@
 .ww-stock-pile span:nth-child(2) { bottom: 12px; }
 .ww-stock-pile span:nth-child(3) { bottom: 24px; width: 34px; }
 .ww-stock.is-empty .ww-stock-pile { opacity: 0.28; }
-.ww-stock:not(.is-full):not(.is-empty)::after {
+.ww-stock:not(.is-empty)::after {   /* always a "tap me" cue while there's batter */
   content: '+'; position: absolute; right: -4px; top: -4px;
   width: 15px; height: 15px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font: 700 10px/1 var(--font-body);
   color: var(--attic-deep); background: var(--neon-green);
   border: 2px solid var(--attic-deep);
+}
+.ww-stock:not(.is-full):not(.is-empty)::after {   /* pulse only while regenerating */
   animation: ww-spawn-pulse 1.8s ease-out infinite;
 }
 @keyframes ww-spawn-pulse {
@@ -192,9 +194,12 @@
 @keyframes ww-slot-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ---------- Counter ---------- */
+.ww-top {
+  position: absolute; left: 0; right: 0; top: 34px;
+  padding: 10px clamp(10px, 4vw, 22px) 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
 .ww-counter {
-  position: absolute; left: 0; right: 0; top: 0;
-  padding: 14px clamp(10px, 4vw, 22px);
   display: flex; gap: 12px; align-items: flex-start;
 }
 .ww-customer { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -230,10 +235,8 @@
 .ww-patience-fill { height: 100%; width: 100%; background: var(--neon-green); transition: width 0.2s linear; }
 .ww-patience-fill.is-low { background: var(--neon-pink); }
 
-/* ---------- Queue (horizontal strip) ---------- */
+/* ---------- Queue (horizontal strip, under the order) ---------- */
 .ww-queue {
-  position: absolute; left: 0; right: 0; top: 126px;
-  padding: 0 clamp(10px, 4vw, 22px);
   display: flex; gap: 8px; align-items: stretch;
 }
 .ww-queue-label {
@@ -262,30 +265,35 @@
   font-size: 9px; line-height: 1.3;
   text-align: center;
   color: var(--ink-dim);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
-/* ---------- Speech bubble ---------- */
+/* ---------- Speech bubble (pops above the customer, lingers, fades) ---------- */
 .ww-say {
-  position: absolute; left: clamp(12px, 5vw, 26px); top: 206px;
-  max-width: 62%;
-  background: rgb(var(--ww-scrim) / 0.92); color: var(--ink);
+  position: absolute; left: clamp(8px, 3vw, 18px); top: 4px;
+  max-width: 58%;
+  background: rgb(var(--ww-scrim) / 0.94); color: var(--ink);
   border: 2px solid var(--edge); border-radius: 8px;
   box-shadow: 3px 3px 0 var(--attic-deep);
-  padding: 8px 12px; font-size: 12px; line-height: 1.3;
-  pointer-events: none;
+  padding: 7px 11px; font-size: 12px; line-height: 1.3;
+  pointer-events: none; z-index: 7;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0s linear 0.25s;
 }
-.ww-say::before {           /* dotted stem up to the portrait */
-  content: ''; position: absolute; left: 18px; top: -24px;
-  width: 2px; height: 18px;
-  background: repeating-linear-gradient(180deg, var(--edge) 0 4px, transparent 4px 8px);
+.ww-say.is-shown {
+  opacity: 1; visibility: visible;
+  transition: opacity 0.25s ease;
+  animation: ww-say-bob 2.6s ease-in-out infinite;
 }
-.ww-say::after {            /* tail */
-  content: ''; position: absolute; left: 14px; top: -7px;
+.ww-say::after {            /* tail pointing down at the portrait */
+  content: ''; position: absolute; left: 16px; bottom: -7px;
   width: 10px; height: 10px;
-  background: rgb(var(--ww-scrim) / 0.92);
-  border-left: 2px solid var(--edge); border-top: 2px solid var(--edge);
+  background: rgb(var(--ww-scrim) / 0.94);
+  border-right: 2px solid var(--edge); border-bottom: 2px solid var(--edge);
   transform: rotate(45deg);
 }
+@keyframes ww-say-bob { 50% { transform: translateY(-3px); } }
 
 /* ---------- Plating ---------- */
 .ww-plate-area { display: flex; align-items: flex-end; gap: 8px; justify-content: center; }
@@ -319,7 +327,7 @@
 }
 .ww-plate.is-overflow { animation: ww-shudder 0.3s ease; box-shadow: 0 0 0 4px var(--neon-pink); }
 
-.ww-shelf { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+.ww-shelf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .ww-chip {
   font-size: 20px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
@@ -441,6 +449,6 @@
   .ww-slot.is-burnt, .ww-plate.is-overflow { animation: none; }
   .ww-stock::after { animation: none; }
   .ww-fly { display: none; }   /* travel is never created under reduced motion, belt and braces */
-  /* .ww-say is a persistent bubble now — nothing to disable */
+  .ww-say.is-shown { animation: none; }   /* no bob — still appears, lingers and clears on its timer */
   /* meter marker / waffle colour still update — they are the mechanic */
 }

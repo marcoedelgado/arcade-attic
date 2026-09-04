@@ -280,16 +280,27 @@ function ticketText(order) {
   return parts.join(' · ');
 }
 
-function say(text) {
-  // A persistent bubble anchored near the portrait: replaced on the next line,
-  // never fades, so it reads the same with animation off.
+let sayTimer = 0;
+function say(text, opts = {}) {
+  clearTimeout(sayTimer);
   let el = root.querySelector('.ww-say');
   if (!el) {
     el = document.createElement('div');
     el.className = 'ww-say';
     root.appendChild(el);
   }
-  el.textContent = text;
+  const show = () => {
+    el.textContent = text;
+    el.classList.add('is-shown');
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(() => el.classList.remove('is-shown'), opts.hold ?? 3400);
+  };
+  if (opts.delay) {
+    el.classList.remove('is-shown');
+    sayTimer = setTimeout(show, opts.delay);
+  } else {
+    show();
+  }
 }
 
 function confetti() {
@@ -322,10 +333,12 @@ function faceEl(customer) {
 }
 
 function renderCounter() {
-  root.querySelector('.ww-counter')?.remove();
-  root.querySelector('.ww-queue')?.remove();
+  root.querySelector('.ww-top')?.remove();
   const cur = state.shift[state.index];
   if (!cur) return;
+
+  const top = document.createElement('div');
+  top.className = 'ww-top';
 
   const counter = document.createElement('div');
   counter.className = 'ww-counter';
@@ -357,7 +370,6 @@ function renderCounter() {
   ticket.append(patience);
 
   counter.append(who, ticket);
-  root.appendChild(counter);
 
   const queue = document.createElement('div');
   queue.className = 'ww-queue';
@@ -381,7 +393,9 @@ function renderCounter() {
     rail.appendChild(f);
   }
   queue.appendChild(rail);
-  root.appendChild(queue);
+
+  top.append(counter, queue);
+  root.appendChild(top);
 }
 
 function startPatience() {
@@ -433,7 +447,7 @@ function nextCustomer() {
   }
   resetPlate();
   renderCounter();
-  say(pickLine(state.shift[state.index], 'greet'));
+  say(pickLine(state.shift[state.index], 'greet'), { delay: 1800 });
   syncSlotCount();
   updateHud();
   startPatience();
@@ -650,7 +664,7 @@ function startShift() {
   root.appendChild(station);
 
   renderCounter();
-  say(pickLine(state.shift[0], 'greet'));
+  say(pickLine(state.shift[0], 'greet'), { delay: 1800 });
   renderHud();
   renderStock();
   startStockClock();
@@ -787,18 +801,29 @@ function hash01(s) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0) / 4294967296;
 }
-const TOPPING_SIZE = { bacon: 22, chocolate: 21, cream: 19, nuts: 18, banana: 18, strawberry: 17, blueberry: 16, cherry: 15, sprinkles: 13 };
-function toppingStyle(id, i) {
-  const col = i % 3;
-  const row = Math.floor(i / 3) % 3;
-  const jx = (hash01(id) - 0.5) * 12;         // ±6%
-  const jy = (hash01(id + 'y') - 0.5) * 12;
-  const rot = (hash01(id + 'r') - 0.5) * 40;  // ±20deg
+// How each topping scatters on the waffle: how many pieces, and how big — so a
+// handful of strawberries reads differently from two rashers of bacon.
+const TOPPING_SPREAD = {
+  strawberry: { count: 3, size: 15 },
+  banana:     { count: 3, size: 15 },
+  chocolate:  { count: 3, size: 14 },
+  nuts:       { count: 4, size: 12 },
+  cream:      { count: 1, size: 24 },
+  sprinkles:  { count: 6, size: 10 },
+  cherry:     { count: 1, size: 18 },
+  bacon:      { count: 2, size: 21 },
+};
+// One piece's placement — polar from the waffle centre, deterministic per key so
+// pieces hold still across the many paintPlate() calls a syrup pour triggers.
+function pieceStyle(id, key, size) {
+  const ang = hash01(`${key}a`) * Math.PI * 2;
+  const rad = 6 + hash01(`${key}r`) * 30;     // % from centre
+  const rot = (hash01(`${key}t`) - 0.5) * 44; // ±22deg
   return {
-    left: `${28 + col * 22 + jx}%`,
-    top: `${26 + row * 22 + jy}%`,
+    left: `${50 + Math.cos(ang) * rad}%`,
+    top: `${50 + Math.sin(ang) * rad}%`,
     transform: `translate(-50%, -50%) rotate(${rot.toFixed(1)}deg)`,
-    fontSize: `${TOPPING_SIZE[id] ?? 17}px`,
+    fontSize: `${size}px`,
   };
 }
 
@@ -812,15 +837,17 @@ function paintPlate() {
     ? `url("${waffleFrameUrl(waffleFrameFor(slot._settled ?? slot.value))}")`
     : 'none';
   waffle.querySelectorAll('.ww-plate-topping').forEach((n) => n.remove());
-  let i = 0;
   for (const id of plate.toppings) {
-    const dot = document.createElement('span');
-    dot.className = 'ww-plate-topping';
-    dot.textContent = content.toppings.find((t) => t.id === id)?.emoji ?? '';
-    Object.assign(dot.style, toppingStyle(id, i));
-    dot.addEventListener('click', () => { plate.toppings.delete(id); syncChips(); paintPlate(); });
-    waffle.appendChild(dot);
-    i++;
+    const emoji = content.toppings.find((t) => t.id === id)?.emoji ?? '';
+    const spread = TOPPING_SPREAD[id] ?? { count: 3, size: 15 };
+    for (let p = 0; p < spread.count; p++) {
+      const dot = document.createElement('span');
+      dot.className = 'ww-plate-topping';
+      dot.textContent = emoji;
+      Object.assign(dot.style, pieceStyle(id, `${id}:${p}`, spread.size));
+      dot.addEventListener('click', () => { plate.toppings.delete(id); syncChips(); paintPlate(); });
+      waffle.appendChild(dot);
+    }
   }
   waffle.querySelector('.ww-plate-syrup').style.height = `${plate.syrupLevel}%`;
   root.querySelector('.ww-syrup-gauge-fill').style.width = `${plate.syrupLevel}%`;

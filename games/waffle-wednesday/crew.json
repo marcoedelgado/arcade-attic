@@ -42,9 +42,9 @@
       "vibe": "Hyper-precise. Narrowest doneness band in the game. Tuts.",
       "order": {
         "band": [48, 56],
-        "toppings": ["blueberry"],
+        "toppings": ["cherry"],
         "syrup": null,
-        "ticketText": "Golden. Actual golden. One topping — exactly one."
+        "ticketText": "Golden. Actual golden. One cherry, dead centre."
       },
       "lines": {
         "greet": ["I've modelled the optimal waffle. Match it.", "Precision, please."],
