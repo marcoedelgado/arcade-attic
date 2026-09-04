@@ -2,6 +2,7 @@ import { crewSpriteEl } from './sprites.js';
 import { waffleFrameUrl, waffleFrameFor } from './waffle-sprite.js';
 import { isBurnt, scoreServe } from './scoring.js';
 import { rampFor, buildShift } from './shift.js';
+import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
 const BEST_KEY = 'waffle-wednesday:best';
 const root = document.getElementById('game');
@@ -17,6 +18,7 @@ const state = {
   walkers: [],
   patienceRaf: 0, patienceStart: 0, patienceMs: 0,
   resolving: false,
+  stock: makeStock(), stockTimer: 0,
 };
 
 const TOAST = { CARRYOVER: 8, SETTLE_MS: 600 };
@@ -118,7 +120,7 @@ function makeSlot() {
 
   const hint = document.createElement('div');
   hint.className = 'ww-slot-hint';
-  hint.textContent = 'tap to toast';
+  hint.textContent = 'empty';
 
   const waffle = document.createElement('div');
   waffle.className = 'ww-waffle';
@@ -214,7 +216,7 @@ function resetSlot(slot) {
   slot.forCustomerId = null;
   slot.el.dataset.empty = 'true';
   slot.el.classList.remove('is-burnt');
-  slot.el.querySelector('.ww-slot-hint').textContent = 'tap to toast';
+  slot.el.querySelector('.ww-slot-hint').textContent = 'empty';
   slot._settled = null;
   slot._burnt = null;
 }
@@ -441,6 +443,7 @@ function fillRoast(tpl) {
 
 function endShift(kind) {
   stopPatience();
+  clearInterval(state.stockTimer);
   resetPlate();
   slots.forEach(resetSlot);
   state.phase = kind === 'bad' ? 'bad' : 'complete';
@@ -510,26 +513,50 @@ function endShift(kind) {
 }
 
 function onSlotClick(slot) {
-  if (slot.el.dataset.empty === 'true') {
-    const frontId = state.shift[state.index].id;
-    const frontBusy = slots.some((s) => s.forCustomerId === frontId && (s.cooking || s._settled != null));
-    const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
-    if (!target) return;
-    dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
-    slot.el.querySelector('.ww-slot-hint').textContent = target.id === frontId ? 'tap to eject' : `for ${target.name}`;
-  } else if (slot.cooking) {
-    ejectWaffle(slot).then(({ settled, burnt }) => {
-      slot._settled = settled;
-      slot._burnt = burnt;
-      paintPlate();   // a non-burnt waffle lands on the plate, ready to top
-    });
-  }
+  if (!slot.cooking) return;
+  ejectWaffle(slot).then(({ settled, burnt }) => {
+    slot._settled = settled;
+    slot._burnt = burnt;
+    paintPlate();   // a non-burnt waffle lands on the plate, ready to top
+  });
+}
+
+function onStockClick() {
+  if (!canSpawn(state.stock)) { say('Out of batter — give it a second.'); return; }
+  const slot = slots.find((s) => s.el.dataset.empty === 'true' && !s._flying);
+  if (!slot) return;   // both toasters occupied
+  const frontId = state.shift[state.index].id;
+  const frontBusy = slots.some((s) => s.forCustomerId === frontId && (s.cooking || s._settled != null));
+  const target = frontBusy ? state.shift[state.index + 1] : state.shift[state.index];
+  if (!target) return;
+  take(state.stock);
+  renderStock();
+  dropWaffle(slot, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
+  slot.el.querySelector('.ww-slot-hint').textContent = target.id === frontId ? 'tap to eject' : `for ${target.name}`;
+}
+
+function renderStock() {
+  const el = root.querySelector('.ww-stock');
+  if (!el) return;
+  el.querySelector('.ww-stock-count').textContent = `stock ${state.stock.count}`;
+  el.classList.toggle('is-empty', state.stock.count === 0);
+  el.classList.toggle('is-full', state.stock.count >= STOCK_MAX);
+}
+
+function startStockClock() {
+  clearInterval(state.stockTimer);
+  state.stockTimer = setInterval(() => {
+    const before = state.stock.count;
+    regen(state.stock, 1000);
+    if (state.stock.count !== before) renderStock();
+  }, 1000);
 }
 
 function startShift() {
   state.phase = 'shift';
   root.classList.remove('ww-bad');
   Object.assign(state, { index: 0, strikes: 0, score: 0, perfects: 0, served: 0, walkers: [], resolving: false });
+  state.stock = makeStock();
   state.shift = buildShift(
     { crew: content.crew, toppings: content.toppings, names: content.names, syrupChoices: content.syrupChoices },
     mulberry32(Date.now() >>> 0),
@@ -541,6 +568,13 @@ function startShift() {
 
   const bench = document.createElement('div');
   bench.className = 'ww-bench';
+
+  const stock = document.createElement('div');
+  stock.className = 'ww-stock';
+  stock.innerHTML = '<div class="ww-stock-pile"><span></span><span></span><span></span></div><div class="ww-stock-count"></div>';
+  stock.addEventListener('click', onStockClick);
+  bench.append(stock);
+
   const toaster = document.createElement('div');
   toaster.className = 'ww-toaster';
   slots = [makeSlot()];
@@ -561,6 +595,8 @@ function startShift() {
   renderCounter();
   say(pickLine(state.shift[0], 'greet'));
   renderHud();
+  renderStock();
+  startStockClock();
   startPatience();
   resetPlate();
   paintPlate();
