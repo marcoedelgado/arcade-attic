@@ -652,7 +652,7 @@ function renderStationExtras(bench, station) {
   const plateEl = document.createElement('div');
   plateEl.className = 'ww-plate';
   plateEl.dataset.empty = 'true';
-  plateEl.innerHTML = '<div class="ww-plate-waffle"></div>';
+  plateEl.innerHTML = '<div class="ww-plate-waffle"><div class="ww-plate-syrup"></div></div>';
 
   const syrup = document.createElement('div');
   syrup.className = 'ww-syrup';
@@ -684,6 +684,28 @@ function platedSlot() {
   return slots.find((s) => s._settled != null && !s._burnt);
 }
 
+// Deterministic 0..1 from a string — keeps a topping's jitter stable across the
+// many paintPlate() calls during a syrup pour.
+function hash01(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0) / 4294967296;
+}
+const TOPPING_SIZE = { bacon: 22, chocolate: 21, cream: 19, nuts: 18, banana: 18, strawberry: 17, blueberry: 16, cherry: 15, sprinkles: 13 };
+function toppingStyle(id, i) {
+  const col = i % 3;
+  const row = Math.floor(i / 3) % 3;
+  const jx = (hash01(id) - 0.5) * 12;         // ±6%
+  const jy = (hash01(id + 'y') - 0.5) * 12;
+  const rot = (hash01(id + 'r') - 0.5) * 40;  // ±20deg
+  return {
+    left: `${28 + col * 22 + jx}%`,
+    top: `${26 + row * 22 + jy}%`,
+    transform: `translate(-50%, -50%) rotate(${rot.toFixed(1)}deg)`,
+    fontSize: `${TOPPING_SIZE[id] ?? 17}px`,
+  };
+}
+
 function paintPlate() {
   const plateEl = root.querySelector('.ww-plate');
   if (!plateEl) return;
@@ -699,12 +721,12 @@ function paintPlate() {
     const dot = document.createElement('span');
     dot.className = 'ww-plate-topping';
     dot.textContent = content.toppings.find((t) => t.id === id)?.emoji ?? '';
-    dot.style.left = `${30 + (i % 3) * 20}%`;
-    dot.style.top = `${30 + Math.floor(i / 3) * 22}%`;
+    Object.assign(dot.style, toppingStyle(id, i));
     dot.addEventListener('click', () => { plate.toppings.delete(id); syncChips(); paintPlate(); });
     waffle.appendChild(dot);
     i++;
   }
+  waffle.querySelector('.ww-plate-syrup').style.height = `${plate.syrupLevel}%`;
   root.querySelector('.ww-syrup-gauge-fill').style.width = `${plate.syrupLevel}%`;
   plateEl.classList.toggle('is-overflow', plate.syrupOverflow);
 }

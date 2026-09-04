@@ -253,12 +253,23 @@
 .ww-plate[data-empty="true"] { opacity: 0.4; }
 .ww-plate[data-empty="true"] .ww-plate-waffle { border: 2px dashed rgba(23,18,43,0.4); }
 .ww-plate-waffle {
-  width: 66%; aspect-ratio: 1; border-radius: 8px;
+  width: 66%; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
   background: center / 100% 100% no-repeat;
   image-rendering: pixelated;
   position: relative;
 }
-.ww-plate-topping { position: absolute; font-size: 18px; transform: translate(-50%, -50%); cursor: pointer; }
+.ww-plate-syrup {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+  background: linear-gradient(180deg, rgba(181,101,29,0.18), rgba(181,101,29,0.72));
+  pointer-events: none;
+}
+.ww-plate.is-overflow .ww-plate-syrup {
+  background: linear-gradient(180deg, rgba(255,93,115,0.32), rgba(255,93,115,0.78));
+}
+.ww-plate-topping {
+  position: absolute; line-height: 1; cursor: pointer;
+  filter: drop-shadow(1px 2px 0 rgba(0,0,0,0.45));
+}
 .ww-plate.is-overflow { animation: ww-shudder 0.3s ease; box-shadow: 0 0 0 4px var(--neon-pink); }
 
 .ww-shelf { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
