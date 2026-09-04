@@ -6,7 +6,6 @@
     { "id": "chocolate", "emoji": "🍫", "label": "chocolate chips" },
     { "id": "nuts", "emoji": "🥜", "label": "crushed nuts" },
     { "id": "cream", "emoji": "🍦", "label": "squirty cream" },
-    { "id": "honey", "emoji": "🍯", "label": "honey drizzle" },
     { "id": "sprinkles", "emoji": "✨", "label": "sprinkles" },
     { "id": "cherry", "emoji": "🍒", "label": "a cherry on top" },
     { "id": "bacon", "emoji": "🥓", "label": "bacon" }

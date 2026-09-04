@@ -21,12 +21,12 @@
     {
       "id": "pitt",
       "name": "Pitt",
-      "vibe": "Wants it pale. Fussy about any browning whatsoever.",
+      "vibe": "Wants it pale. Fussy about any browning whatsoever. No toppings — they'd only distract.",
       "order": {
         "band": [20, 34],
-        "toppings": ["honey"],
+        "toppings": [],
         "syrup": null,
-        "ticketText": "Pale. I said PALE. Barely toasted."
+        "ticketText": "Pale. I said PALE. Barely toasted. Nothing on it."
       },
       "lines": {
         "greet": ["Keep it light. Lighter than that.", "No colour. None."],
@@ -42,9 +42,9 @@
       "vibe": "Hyper-precise. Narrowest doneness band in the game. Tuts.",
       "order": {
         "band": [48, 56],
-        "toppings": ["blueberry", "honey"],
+        "toppings": ["blueberry"],
         "syrup": null,
-        "ticketText": "Golden. Actual golden. Two toppings, no more."
+        "ticketText": "Golden. Actual golden. One topping — exactly one."
       },
       "lines": {
         "greet": ["I've modelled the optimal waffle. Match it.", "Precision, please."],
