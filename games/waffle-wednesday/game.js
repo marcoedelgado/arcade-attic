@@ -6,7 +6,6 @@ import { makeDirector } from './director.js';
 import { makeMenu } from './menu.js';
 import { makeSlot } from './toaster.js';
 import { scatter } from './scatter.js';
-import { makeStock, regen, canSpawn, take, STOCK_MAX } from './stock.js';
 
 const BEST_KEY = 'waffle-wednesday:best';
 const root = document.getElementById('game');
@@ -20,7 +19,6 @@ const state = {
   shift: [],
   patienceRaf: 0, patienceStart: 0, patienceMs: 0,
   resolving: false,   // a customer is leaving the counter — hold input until the next one lands
-  stock: makeStock(), stockTimer: 0,
 };
 
 // The running shift: index, strikes, score, and the serve/walkout transitions.
@@ -233,12 +231,10 @@ function resetSlot(rec) {
   rec.sim = null;
   rec.forId = null;
   rec.el.querySelector('.ww-steam')?.remove();
-  if (rec.fly) {                       // a carry-in was still in flight — cancel and refund
+  if (rec.fly) {                       // a carry-in was still in flight — cancel it
     rec.fly.remove();
     rec.fly = null;
     rec.incomingFor = null;
-    state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
-    renderStock();
   }
   rec.el.dataset.empty = 'true';
   rec.el.classList.remove('is-burnt', 'is-plated');
@@ -452,7 +448,6 @@ function ratingFor(score, kind) {
 function endShift(kind) {
   stopPatience();
   stopToasterLoop();
-  clearInterval(state.stockTimer);
   resetPlate();
   slots.forEach(resetSlot);
   state.phase = kind === 'bad' ? 'bad' : 'complete';
@@ -534,25 +529,18 @@ function onSlotClick(rec) {
   }, TOAST.SETTLE_MS);
 }
 
+// Tap the batter pile to send a fresh waffle to the toaster.
 function onStockClick() {
   if (!current()) return;   // shift over — a reaction beat is still playing out
-  if (!canSpawn(state.stock)) { say('Out of batter — give it a second.'); return; }
   const rec = slots.find((r) => !r.sim && !r.incomingFor);
   if (!rec) return;   // the toaster is occupied
   const target = current();
-
-  take(state.stock);           // decrement on the tap; resetSlot refunds a cancelled flight
-  renderStock();
 
   const land = () => {
     rec.fly = null;
     rec.incomingFor = null;
     const cur = current();
-    if (!cur || target.id < cur.id) {           // that customer already left — refund
-      state.stock.count = Math.min(STOCK_MAX, state.stock.count + 1);
-      renderStock();
-      return;
-    }
+    if (!cur || target.id < cur.id) return;   // that customer already left
     dropWaffle(rec, { ...target.order, meterRate: target.ramp.meterRate }, target.id);
   };
 
@@ -563,28 +551,10 @@ function onStockClick() {
   });
 }
 
-function renderStock() {
-  const el = root.querySelector('.ww-stock');
-  if (!el) return;
-  el.querySelector('.ww-stock-count').textContent = `stock ${state.stock.count}`;
-  el.classList.toggle('is-empty', state.stock.count === 0);
-  el.classList.toggle('is-full', state.stock.count >= STOCK_MAX);
-}
-
-function startStockClock() {
-  clearInterval(state.stockTimer);
-  state.stockTimer = setInterval(() => {
-    const before = state.stock.count;
-    regen(state.stock, 1000);
-    if (state.stock.count !== before) renderStock();
-  }, 1000);
-}
-
 function startShift() {
   state.phase = 'shift';
   root.classList.remove('ww-bad');
   state.resolving = false;
-  state.stock = makeStock();
   state.shift = menu.roster(mulberry32(Date.now() >>> 0));
   director = makeDirector(state.shift);
   root.replaceChildren();
@@ -597,7 +567,7 @@ function startShift() {
 
   const stock = document.createElement('div');
   stock.className = 'ww-stock';
-  stock.innerHTML = '<div class="ww-stock-pile"><span></span><span></span><span></span></div><div class="ww-stock-count"></div>';
+  stock.innerHTML = '<div class="ww-stock-pile"><span></span><span></span><span></span></div>';
   stock.addEventListener('click', onStockClick);
   bench.append(stock);
 
@@ -621,8 +591,6 @@ function startShift() {
   renderCounter();
   say(menu.line(current(), 'greet'), { delay: 1800 });
   renderHud();
-  renderStock();
-  startStockClock();
   startToasterLoop();
   startPatience();
   resetPlate();

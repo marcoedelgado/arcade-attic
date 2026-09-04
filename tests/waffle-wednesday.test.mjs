@@ -369,31 +369,6 @@ test('waffleFrameFor: buckets doneness into the four frames in order', async () 
   for (const [v, id] of boundaries) assert.equal(waffleFrameFor(v), id, `v${v}`);
 });
 
-test('stock: starts full, take decrements, refuses at zero', async () => {
-  const { makeStock, canSpawn, take, STOCK_MAX } = await import('../games/waffle-wednesday/stock.js');
-  const s = makeStock();
-  assert.equal(s.count, STOCK_MAX);
-  assert.equal(canSpawn(s), true);
-  for (let i = 0; i < STOCK_MAX; i++) assert.equal(take(s), true);
-  assert.equal(s.count, 0);
-  assert.equal(canSpawn(s), false);
-  assert.equal(take(s), false);
-  assert.equal(s.count, 0);
-});
-
-test('stock: regen adds one per interval, up to the cap, inert when full', async () => {
-  const { makeStock, regen, take, STOCK_MAX, STOCK_REGEN_MS } = await import('../games/waffle-wednesday/stock.js');
-  const s = makeStock();
-  take(s); take(s);                     // count 6
-  regen(s, STOCK_REGEN_MS - 1);
-  assert.equal(s.count, 6);
-  regen(s, 1);
-  assert.equal(s.count, 7);
-  regen(s, STOCK_REGEN_MS * 9);         // would overshoot; caps
-  assert.equal(s.count, STOCK_MAX);
-  assert.equal(s.sinceRegen, 0);        // timer reset at the cap
-});
-
 /* ---------- director.js — the running shift ---------- */
 
 // A stand-in customer roster. The director never inspects an order, only the
