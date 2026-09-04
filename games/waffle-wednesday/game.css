@@ -133,6 +133,8 @@
   letter-spacing: 2px; padding: 13px 0;
   border: 3px solid var(--attic-deep); border-radius: 8px;
 }
+.aa-btn.ww-serve[disabled] { opacity: 0.45; cursor: default; }
+.aa-btn.ww-serve[disabled]:hover { transform: none; box-shadow: var(--shadow); }
 .ww-slot {
   position: relative;
   width: clamp(84px, 26vw, 120px);

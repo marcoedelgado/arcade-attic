@@ -334,6 +334,7 @@ function faceEl(customer) {
 
 function renderCounter() {
   root.querySelector('.ww-top')?.remove();
+  root.querySelector('.ww-serve')?.removeAttribute('disabled');
   const cur = state.shift[state.index];
   if (!cur) return;
 
@@ -719,6 +720,7 @@ function onServe() {
 
   state.resolving = true;
   stopPatience();
+  root.querySelector('.ww-serve')?.setAttribute('disabled', '');   // no double-serve; shows it registered
 
   const result = scoreServe({
     doneness: slot._settled,
@@ -874,6 +876,8 @@ function syncChips() {
 function makeChipDraggable(chip, plateEl) {
   chip.addEventListener('pointerdown', (e) => {
     if (!platedSlot()) return;
+    e.preventDefault();
+    const pointerId = e.pointerId;
     const ghost = chip.cloneNode(true);
     ghost.style.position = 'fixed';
     ghost.style.left = `${e.clientX}px`;
@@ -883,13 +887,19 @@ function makeChipDraggable(chip, plateEl) {
     ghost.style.zIndex = '50';
     document.body.appendChild(ghost);
     chip.classList.add('dragging');
-    try { chip.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    try { chip.setPointerCapture(pointerId); } catch { /* ignore */ }
 
     const move = (ev) => { ghost.style.left = `${ev.clientX}px`; ghost.style.top = `${ev.clientY}px`; };
-    const up = (ev) => {
+    let done = false;
+    const teardown = (ev) => {
+      if (done) return;
+      done = true;
       chip.removeEventListener('pointermove', move);
-      chip.removeEventListener('pointerup', up);
-      chip.removeEventListener('pointercancel', up);
+      chip.removeEventListener('pointerup', teardown);
+      chip.removeEventListener('pointercancel', teardown);
+      window.removeEventListener('pointerup', teardown);
+      window.removeEventListener('pointercancel', teardown);
+      try { chip.releasePointerCapture(pointerId); } catch { /* already released */ }
       chip.classList.remove('dragging');
       ghost.remove();
       const r = plateEl.getBoundingClientRect();
@@ -901,8 +911,11 @@ function makeChipDraggable(chip, plateEl) {
       }
     };
     chip.addEventListener('pointermove', move);
-    chip.addEventListener('pointerup', up);
-    chip.addEventListener('pointercancel', up);
+    chip.addEventListener('pointerup', teardown);
+    chip.addEventListener('pointercancel', teardown);
+    // backstops in case the captured element never delivers the release
+    window.addEventListener('pointerup', teardown);
+    window.addEventListener('pointercancel', teardown);
   });
 }
 
