@@ -4,9 +4,10 @@ import { makeField } from './field.js';
 import { makeShip } from './ship.js';
 import { makeLoop } from './loop.js';
 import { checkHits } from './collision.js';
-import { render, readPalette } from './render.js';
+import { render, readPalette, drawShipHero } from './render.js';
 import { makeParticles } from './particles.js';
 import { drawHud, drawOverlay } from './hud.js';
+import { makeWarp } from './fx.js';
 
 const BEST_KEY = 'asteroid-run:best';
 const host = document.getElementById('game');
@@ -58,12 +59,16 @@ const field = makeField({ rng: Math.random, asteroids, stars });
 const ship = makeShip({ camera, viewport: vp });
 const loop = makeLoop();
 
+const warp = makeWarp();
+warp.reset(run.snapshot().sectorHue);
+
 let state = 'title';         // 'title' | 'playing' | 'dying' | 'dead'
 let runMs = 0;
 let dyingMs = 0;
 let bannerMs = 0;
 let shake = 0;
 let sectorName = run.snapshot().sectorName;
+let sectorIndex = run.snapshot().sectorIndex;
 let sectorProgress = 0;
 let scoreWeight = 1;
 
@@ -82,6 +87,8 @@ function startRun() {
   scoreWeight = 1;
   state = 'playing';
   sectorName = run.snapshot().sectorName;
+  sectorIndex = run.snapshot().sectorIndex;
+  warp.reset(run.snapshot().sectorHue);
 }
 
 function enterDying() {
@@ -97,6 +104,9 @@ function enterDead() {
 
 /* ---------- frame ---------- */
 function frame(dt) {
+  warp.step(dt);
+  const hue = reducedMotion ? warp.target : warp.hue;
+
   if (state === 'playing') {
     runMs += dt * 1000 * scoreWeight;
     const r = run.advance(dt);
@@ -105,8 +115,12 @@ function frame(dt) {
     sectorProgress = r.sectorProgress;
     if (r.justCleared) {
       ship.refillShields();
-      sectorName = run.snapshot().sectorName;
+      const snap = run.snapshot();
+      sectorName = snap.sectorName;
+      sectorIndex = snap.sectorIndex;
+      warp.trigger(hue, r.sector.hue);
       bannerMs = 1500;
+      shake = Math.max(shake, 6);
     }
     if (bannerMs > 0) bannerMs -= dt * 1000;
 
@@ -114,6 +128,11 @@ function frame(dt) {
     s.loop = r.loop;
     s.box = ship.box();
     field.step(dt, r.sector, s);
+    if (!reducedMotion) {
+      const sp = camera.project(s.x, s.y, 60);
+      particles.spawnTrail(sp.sx, sp.sy, Math.random() < 0.15);
+      if (Math.random() < 0.6) particles.spawnTrail(sp.sx, sp.sy, false);
+    }
     particles.step(dt);
 
     for (const hit of checkHits(ship.worldPos(), asteroids, camera.project)) {
@@ -132,19 +151,24 @@ function frame(dt) {
     if (dyingMs <= 0) enterDead();
   } else {
     // title / dead: drift the starfield only
-    field.step(dt, { speed: reducedMotion ? 0 : 40, spawnRate: 0, sizeRange: [10, 10], reach: 1, pattern: 'scatter' }, { x: 0, y: 0, loop: 0, box: ship.box() });
+    field.step(dt, { speed: reducedMotion ? 0 : 40, spawnRate: 0, sizeRange: [10, 10], reach: 1, pattern: 'scatter', kind: 'asteroids' }, { x: 0, y: 0, loop: 0, box: ship.box() });
   }
 
   // draw
   const shipSnap = ship.update(0);
   shipSnap.blink = ship.invulnerable ? (performance.now() % 1000) / 1000 : 0;
   shipSnap.destroyed = state === 'dying';
-  render(ctx, camera, { asteroids, stars, debris, ship: shipSnap, shake }, { vp, palette, reducedMotion });
+  render(ctx, camera,
+    { asteroids, stars, debris, trail, ship: shipSnap, shake },
+    { vp, palette, reducedMotion, fx: { hue, warpT: warp.warpT, sectorIndex }, hideShip: state === 'title' });
   if (state === 'playing' || state === 'dying') {
-    drawHud(ctx, vp, { timeMs: runMs, shields: ship.shields, sectorName, sectorProgress, bannerMs });
+    drawHud(ctx, vp, { timeMs: runMs, shields: ship.shields, sectorName, sectorIndex, sectorProgress, bannerMs, hue });
   }
-  if (state === 'title') drawOverlay(ctx, vp, { kind: 'title', bestMs: loadBest() });
-  if (state === 'dead') drawOverlay(ctx, vp, { kind: 'gameover', runMs, bestMs: loadBest() });
+  if (state === 'title') {
+    drawShipHero(ctx, vp, palette, performance.now() / 1000, hue);
+    drawOverlay(ctx, vp, { kind: 'title', bestMs: loadBest(), hue });
+  }
+  if (state === 'dead') drawOverlay(ctx, vp, { kind: 'gameover', runMs, bestMs: loadBest(), hue });
 }
 
 /* ---------- input ---------- */
