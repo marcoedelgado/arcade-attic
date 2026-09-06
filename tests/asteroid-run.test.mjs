@@ -7,6 +7,9 @@ import { makeLoop } from '../games/asteroid-run/loop.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
+// A stand-in for ship.box() at a 1280×720-ish viewport: half-width 80, y-centre ~40.
+const boxStub = { x0: -80, x1: 80, y0: -3, y1: 84 };
+
 test('camera: project → unproject round-trips at the same z', () => {
   const cam = makeCamera({ width: 1280, height: 720 });
   for (const [x, y, z] of [[0, 0, 60], [120, -40, 300], [-260, 200, 900]]) {
@@ -97,40 +100,58 @@ test('run: reducedMotion scales the effective sector down', () => {
   assert.ok(reduced.spawnRate < plain.spawnRate * 0.7);
 });
 
-const sector = { speed: 320, spread: 260 };
+test('run: every sector carries a numeric reach multiplier (not absolute units)', () => {
+  for (const s of SECTORS) {
+    assert.equal(typeof s.reach, 'number', `${s.name} reach is not a number`);
+    assert.ok(s.reach >= 1 && s.reach <= 2, `${s.name} reach ${s.reach} out of [1, 2]`);
+    assert.equal(s.spread, undefined, `${s.name} still has a legacy spread key`);
+  }
+});
+
+test('run: reach does not escalate with loop', () => {
+  const run = makeRun();
+  for (let i = 0; i < SECTORS.length * 5; i++) {
+    run.advance(SECTORS[run.snapshot().sectorIndex].duration + 0.01);
+  }
+  const idx = run.snapshot().sectorIndex;
+  assert.equal(run.advance(0.016).sector.reach, SECTORS[idx].reach);
+});
+
+const sector = { speed: 320, reach: 1.3 };
 
 test('fairness: an already-safe candidate is returned unchanged', () => {
   const candidate = { id: 1, x: 200, y: 0, z: 900, r: 20 };
-  const ship = { x: -100, y: 0, loop: 0 };
+  const ship = { x: -100, y: 0, loop: 0, box: boxStub };
   assert.equal(placeSpawn(candidate, ship, sector), candidate);
 });
 
 // Exercises the reachable-gap branch as a unit contract; the live spawner only
 // produces z=900, where that branch is a low-z backstop.
-test('fairness: a candidate bearing straight down on the ship is nudged aside', () => {
-  const candidate = { id: 2, x: 0, y: 0, z: 30, r: 40 }; // so close there's no time to reach clear
-  const ship = { x: 0, y: 0, loop: 0 };
+test('fairness: a candidate bearing down on the ship is nudged aside and clamped to the box reach', () => {
+  const candidate = { id: 2, x: 0, y: 0, z: 30, r: 90 }; // so close + big that no lateral gap is reachable
+  const ship = { x: 0, y: 0, loop: 0, box: boxStub };
   const out = placeSpawn(candidate, ship, sector);
   assert.notEqual(out, candidate);
   assert.ok(Math.abs(out.x) > Math.abs(candidate.x), 'not pushed away from the ship');
+  // clamped to boxHalfW * reach = 80 * 1.3 = 104, NOT the old absolute spread
+  assert.ok(Math.abs(out.x) <= 80 * 1.3 + 1e-9, `out.x ${out.x} exceeds the box reach clamp`);
 });
 
-test('fairness: near-ship suppression clears space at high loop', () => {
+test('fairness: near-ship suppression clears a box-relative bubble at high loop', () => {
   const candidate = { id: 3, x: 10, y: 10, z: 600, r: 20 };
-  const ship = { x: 0, y: 0, loop: 3 };
+  const ship = { x: 0, y: 0, loop: 3, box: boxStub };
+  const clearR = Math.min(70, (boxStub.x1 - boxStub.x0) / 2 * 0.5); // = 40 here
   const out = placeSpawn(candidate, ship, sector);
-  // either dropped, or moved clear of the ship bubble
   assert.ok(
-    out === null || Math.hypot(out.x - ship.x, out.y - ship.y) >= 69,
-    `expected null or a spawn >=69 from the ship, got ${JSON.stringify(out)}`,
+    out === null || Math.hypot(out.x - ship.x, out.y - ship.y) >= clearR - 1e-9,
+    `expected null or a spawn >= ${clearR} from the ship, got ${JSON.stringify(out)}`,
   );
 });
 
 test('fairness: near-ship suppression is inactive at loop 0', () => {
   const candidate = { id: 4, x: 10, y: 10, z: 600, r: 20 };
-  const ship = { x: 0, y: 0, loop: 0 };
-  const out = placeSpawn(candidate, ship, sector);
-  assert.equal(out, candidate);
+  const ship = { x: 0, y: 0, loop: 0, box: boxStub };
+  assert.equal(placeSpawn(candidate, ship, sector), candidate);
 });
 
 import { checkHits } from '../games/asteroid-run/collision.js';
@@ -178,8 +199,8 @@ test('collision: multiple simultaneous hits are all returned', () => {
 import { makeField } from '../games/asteroid-run/field.js';
 import { mulberry32 } from '../games/waffle-wednesday/shift.js';
 
-const flatSector = { speed: 300, spawnRate: 2, sizeRange: [20, 20], spread: 260, pattern: 'scatter' };
-const farShip = { x: 0, y: 0, loop: 0 };
+const flatSector = { speed: 300, spawnRate: 2, sizeRange: [20, 20], reach: 1.4, pattern: 'scatter' };
+const farShip = { x: 0, y: 0, loop: 0, box: boxStub };
 
 test('field: reset fills the star array and clears asteroids', () => {
   const asteroids = [{ id: 9, x: 0, y: 0, z: 5, r: 1 }];
@@ -213,16 +234,71 @@ test('field: asteroids age toward the camera at sector.speed and cull past CULL_
   assert.equal(asteroids.length, 0);
 });
 
-test('field: every candidate passes through placeSpawn (unavoidable ones get nudged)', () => {
+test('field: every candidate passes through placeSpawn (near-ship bubble is kept clear)', () => {
   const asteroids = [];
   const stars = [];
-  // ship dead centre, high loop ⇒ near-ship suppression will move/skip anything close
   const field = makeField({ rng: mulberry32(3), asteroids, stars });
   field.reset();
-  field.step(1.0, { ...flatSector, spread: 5 }, { x: 0, y: 0, loop: 5 });
+  const clearR = Math.min(70, (boxStub.x1 - boxStub.x0) / 2 * 0.5);
+  // ship dead centre, high loop ⇒ near-ship suppression moves/skips anything close
+  field.step(1.0, { ...flatSector, reach: 0.1 }, { x: 0, y: 0, loop: 5, box: boxStub });
   for (const a of asteroids) {
-    assert.ok(Math.hypot(a.x, a.y) >= 60, 'a spawn landed inside the ship bubble');
+    assert.ok(
+      Math.hypot(a.x - 0, a.y - 0) >= clearR - 1e-9,
+      `a spawn landed ${Math.hypot(a.x, a.y).toFixed(1)} from the ship (< ${clearR})`,
+    );
   }
+});
+
+test('field: a stream rock drifts laterally back toward the box centre', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(11), asteroids, stars });
+  field.reset();
+  field.step(1.0, { ...flatSector, pattern: 'stream', spawnRate: 1, reach: 1.15 }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 1);
+  const a = asteroids[0];
+  assert.notEqual(a.vx, 0, 'stream rock has no lateral drift');
+  assert.equal(Math.sign(a.vx), -Math.sign(a.x), `vx ${a.vx} should point back toward centre from x ${a.x}`);
+});
+
+test('field: a gate spawn emits a straddling pair with a clear central lane', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(5), asteroids, stars });
+  field.reset();
+  field.step(1.0, { ...flatSector, pattern: 'gate', spawnRate: 1, reach: 1.3, sizeRange: [20, 20] }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 2, 'gate should spawn two rocks per tick');
+  const [a, b] = [...asteroids].sort((p, q) => p.x - q.x);
+  const laneWidth = (b.x - b.r) - (a.x + a.r);
+  assert.ok(laneWidth > 0, `no lane between the walls: ${laneWidth.toFixed(1)}`);
+  const gapCentre = (a.x + b.x) / 2;
+  assert.ok(Math.abs(gapCentre) <= (boxStub.x1 - boxStub.x0) / 2, 'gap centre fell outside the box');
+});
+
+test('field: step integrates a rock\'s vx into its x each frame', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(1), asteroids, stars });
+  field.reset();
+  asteroids.push({ id: 99, x: 100, y: 0, z: 500, r: 10, vx: -40, vy: 0 });
+  field.step(0.5, { ...flatSector, spawnRate: 0 }, farShip);
+  assert.ok(Math.abs(asteroids[0].x - 80) < 1e-9, `x ${asteroids[0].x} — expected 100 + (-40 * 0.5)`);
+  assert.ok(Math.abs(asteroids[0].z - 350) < 1e-9, `z ${asteroids[0].z} — expected 500 - (300 * 0.5)`);
+});
+
+test('field: a scatter candidate lands within the box reach in x and y', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(8), asteroids, stars });
+  field.reset();
+  field.step(1.0, { ...flatSector, spawnRate: 1, reach: 1.4 }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 1);
+  const a = asteroids[0];
+  const bhw = (boxStub.x1 - boxStub.x0) / 2;
+  const cy = (boxStub.y0 + boxStub.y1) / 2;
+  assert.ok(Math.abs(a.x) <= bhw * 1.4 + 1e-9, `x ${a.x} outside reach`);
+  assert.ok(Math.abs(a.y - cy) <= (boxStub.y1 - boxStub.y0) / 2 * 1.4 + 1e-9, `y ${a.y} outside reach`);
 });
 
 test('field: it mutates the exact arrays it was given', () => {
