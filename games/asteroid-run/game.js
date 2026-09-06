@@ -129,6 +129,7 @@ function frame(dt) {
 
     const s = ship.update(dt);
     s.loop = r.loop;
+    s.box = ship.box();
     field.step(dt, r.sector, s);
     stepDebris(dt);
 
@@ -142,13 +143,13 @@ function frame(dt) {
     if (ship.shields <= 0) enterDying();
   } else if (state === 'dying') {
     dyingMs -= dt * 1000;
-    field.step(dt, lastSector, { x: 0, y: 0, loop: 0 });
+    field.step(dt, lastSector, { x: 0, y: 0, loop: 0, box: ship.box() });
     stepDebris(dt);
     if (shake > 0) shake = Math.max(0, shake - dt * 20);
     if (dyingMs <= 0) enterDead();
   } else {
     // title / dead: drift the starfield only
-    field.step(dt, { speed: reducedMotion ? 0 : 40, spawnRate: 0, sizeRange: [10, 10], spread: 260, pattern: 'scatter' }, { x: 0, y: 0, loop: 0 });
+    field.step(dt, { speed: reducedMotion ? 0 : 40, spawnRate: 0, sizeRange: [10, 10], reach: 1, pattern: 'scatter' }, { x: 0, y: 0, loop: 0, box: ship.box() });
   }
 
   // draw
