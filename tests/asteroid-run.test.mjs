@@ -248,8 +248,8 @@ test('ship: movement stays inside the box', () => {
   ship.aim(99999, 99999, 'touch'); // way off-screen
   let s;
   for (let i = 0; i < 400; i++) s = ship.update(1 / 60);
-  const half = vp.width / 2;
-  assert.ok(s.x <= half && s.x >= -half - 1, `x ${s.x} outside width`);
+  const rightEdge = makeCamera(vp).unproject(vp.width - 30, vp.height * 0.40, 60).x;
+  assert.ok(Math.abs(s.x - rightEdge) < 1, `x ${s.x} not at box edge ${rightEdge}`);
 });
 
 test('ship: touch aim sits above the finger', () => {
@@ -295,6 +295,17 @@ test('ship: refillShields restores to 3', () => {
   ship.hit();
   ship.refillShields();
   assert.equal(ship.shields, 3);
+});
+
+test('ship: update(0) is a side-effect-free snapshot (does not reset camera roll)', () => {
+  const camera = makeCamera(vp);
+  const ship = makeShip({ camera, viewport: vp });
+  ship.aim(1100, 200, 'mouse');
+  for (let i = 0; i < 30; i++) ship.update(1 / 60);
+  // capture roll via its effect on a projected point
+  const movedX = camera.project(100, 0, 100).sx;
+  ship.update(0);
+  assert.equal(camera.project(100, 0, 100).sx, movedX, 'update(0) changed the camera roll');
 });
 
 test('ship: MAX_SPEED matches the fairness reach constant', () => {

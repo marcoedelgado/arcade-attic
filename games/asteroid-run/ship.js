@@ -60,10 +60,13 @@ export function makeShip({ camera, viewport }) {
       pos.y += (target.y - pos.y) * a;
       clampBox(pos);
 
-      const vx = dt > 0 ? (pos.x - prevX) / dt : 0;
-      prevX = pos.x;
-      banking += ((Math.max(-1, Math.min(1, vx / MAX_SPEED))) - banking) * a;
-      camera.setRoll(-vx * ROLL_FACTOR / MAX_SPEED * 40);
+      let vx = 0;
+      if (dt > 0) {
+        vx = (pos.x - prevX) / dt;
+        prevX = pos.x;
+        banking += ((Math.max(-1, Math.min(1, vx / MAX_SPEED))) - banking) * a;
+        camera.setRoll(-vx * ROLL_FACTOR / MAX_SPEED * 40);
+      }
 
       if (invulnMs > 0) invulnMs = Math.max(0, invulnMs - dt * 1000);
 
