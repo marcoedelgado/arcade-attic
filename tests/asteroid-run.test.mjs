@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeCamera } from '../games/asteroid-run/camera.js';
+import { makeRun, SECTORS } from '../games/asteroid-run/run.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
@@ -47,4 +48,50 @@ test('camera: two instances are independent', () => {
   const b = makeCamera({ width: 1280, height: 720 });
   a.setRoll(100);
   assert.equal(b.project(0, 0, 100).sx, 640);
+});
+
+test('run: a sector clears exactly at its duration', () => {
+  const run = makeRun();
+  const d = SECTORS[0].duration;
+  let r = run.advance(d - 0.1);
+  assert.equal(r.justCleared, false);
+  assert.equal(run.snapshot().sectorIndex, 0);
+  r = run.advance(0.2); // crosses d
+  assert.equal(r.justCleared, true);
+  assert.equal(run.snapshot().sectorIndex, 1);
+});
+
+test('run: justCleared is true for one frame only', () => {
+  const run = makeRun();
+  run.advance(SECTORS[0].duration + 0.01);
+  const next = run.advance(0.016);
+  assert.equal(next.justCleared, false);
+});
+
+test('run: wraps to sector index 1 and bumps loop after the last named sector', () => {
+  const run = makeRun();
+  for (let i = 0; i < SECTORS.length; i++) {
+    run.advance(SECTORS[run.snapshot().sectorIndex].duration + 0.01);
+  }
+  assert.equal(run.snapshot().sectorIndex, 1);
+  assert.equal(run.snapshot().loop, 1);
+});
+
+test('run: escalation multiplies speed but respects the cap', () => {
+  const run = makeRun();
+  const base = SECTORS[1].speed;
+  // clear enough loops to slam into the cap
+  for (let i = 0; i < SECTORS.length * 15; i++) {
+    run.advance(SECTORS[run.snapshot().sectorIndex].duration + 0.01);
+  }
+  const { sector } = run.advance(0.016);
+  assert.ok(sector.speed <= base * 2.4 + 1e-6, `speed ${sector.speed} over cap`);
+  assert.ok(sector.speed > base, 'speed did not escalate at all');
+});
+
+test('run: reducedMotion scales the effective sector down', () => {
+  const plain = makeRun().advance(0.016).sector;
+  const reduced = makeRun({ reducedMotion: true }).advance(0.016).sector;
+  assert.ok(reduced.speed < plain.speed * 0.7);
+  assert.ok(reduced.spawnRate < plain.spawnRate * 0.7);
 });
