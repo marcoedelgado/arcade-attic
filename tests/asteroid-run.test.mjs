@@ -228,3 +228,75 @@ test('field: it mutates the exact arrays it was given', () => {
   field.step(1.0, flatSector, farShip);
   assert.ok(asteroids.length > 0); // same reference the test holds
 });
+
+import { makeShip, MAX_SPEED } from '../games/asteroid-run/ship.js';
+
+const vp = { width: 1280, height: 720 };
+const mkShip = () => makeShip({ camera: makeCamera(vp), viewport: vp });
+
+test('ship: eased follow converges on the aim target', () => {
+  const ship = mkShip();
+  ship.aim(1000, 200, 'mouse');
+  let s;
+  for (let i = 0; i < 400; i++) s = ship.update(1 / 60);
+  const aimed = makeCamera(vp).unproject(1000, 200 - 30, 60);
+  assert.ok(Math.abs(s.x - aimed.x) < 2, `x settled at ${s.x}, wanted ~${aimed.x}`);
+});
+
+test('ship: movement stays inside the box', () => {
+  const ship = mkShip();
+  ship.aim(99999, 99999, 'touch'); // way off-screen
+  let s;
+  for (let i = 0; i < 400; i++) s = ship.update(1 / 60);
+  const half = vp.width / 2;
+  assert.ok(s.x <= half && s.x >= -half - 1, `x ${s.x} outside width`);
+});
+
+test('ship: touch aim sits above the finger', () => {
+  const ship = mkShip();
+  ship.aim(640, 500, 'touch');
+  const settleTouch = (() => { let s; for (let i = 0; i < 400; i++) s = ship.update(1 / 60); return s; })();
+  const ship2 = mkShip();
+  ship2.aim(640, 500, 'mouse');
+  const settleMouse = (() => { let s; for (let i = 0; i < 400; i++) s = ship2.update(1 / 60); return s; })();
+  assert.ok(settleTouch.y < settleMouse.y, 'touch target should be higher up (smaller world y) than mouse');
+});
+
+test('ship: keyboard thrust moves the target', () => {
+  const ship = mkShip();
+  const x0 = ship.update(0).x;
+  ship.setThrust(1, 0);
+  let s;
+  for (let i = 0; i < 120; i++) s = ship.update(1 / 60);
+  assert.ok(s.x > x0 + 50, 'thrust did not move the ship right');
+});
+
+test('ship: a hit costs one shield, then invulnerability blocks the next', () => {
+  const ship = mkShip();
+  assert.equal(ship.shields, 3);
+  assert.equal(ship.hit(), true);
+  assert.equal(ship.shields, 2);
+  assert.equal(ship.invulnerable, true);
+  assert.equal(ship.hit(), false); // ignored while invulnerable
+  assert.equal(ship.shields, 2);
+});
+
+test('ship: invulnerability clears after its window', () => {
+  const ship = mkShip();
+  ship.hit();
+  for (let i = 0; i < 120; i++) ship.update(1 / 60); // 2s > 900ms
+  assert.equal(ship.invulnerable, false);
+});
+
+test('ship: refillShields restores to 3', () => {
+  const ship = mkShip();
+  ship.hit();
+  for (let i = 0; i < 120; i++) ship.update(1 / 60);
+  ship.hit();
+  ship.refillShields();
+  assert.equal(ship.shields, 3);
+});
+
+test('ship: MAX_SPEED matches the fairness reach constant', () => {
+  assert.equal(MAX_SPEED, 520);
+});
