@@ -127,3 +127,37 @@ test('fairness: near-ship suppression is inactive at loop 0', () => {
   const out = placeSpawn(candidate, ship, sector);
   assert.equal(out, candidate);
 });
+
+import { checkHits } from '../games/asteroid-run/collision.js';
+
+// simple stub: world x/y map straight to screen, scale fixed at 1
+const flatProject = (x, y) => ({ sx: x, sy: y, scale: 1 });
+const shipAt = { x: 0, y: 0, z: 60 };
+
+test('collision: an asteroid outside the z-slab never hits', () => {
+  const rocks = [{ id: 1, x: 0, y: 0, z: 120, r: 100 }]; // right on top, but too far in z
+  assert.deepEqual(checkHits(shipAt, rocks, flatProject), []);
+});
+
+test('collision: an overlapping asteroid inside the slab hits', () => {
+  const rocks = [{ id: 2, x: 5, y: 0, z: 60, r: 40 }];
+  const hits = checkHits(shipAt, rocks, flatProject);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].id, 2);
+});
+
+test('collision: a grazing miss does not register', () => {
+  // ship radius ~ SHIP_R*0.6, asteroid 0.6*r; centres far enough apart to clear both
+  const rocks = [{ id: 3, x: 500, y: 0, z: 60, r: 20 }];
+  assert.deepEqual(checkHits(shipAt, rocks, flatProject), []);
+});
+
+test('collision: multiple simultaneous hits are all returned', () => {
+  const rocks = [
+    { id: 4, x: 0, y: 0, z: 55, r: 30 },
+    { id: 5, x: 3, y: 3, z: 70, r: 30 },
+    { id: 6, x: 999, y: 0, z: 60, r: 10 },
+  ];
+  const ids = checkHits(shipAt, rocks, flatProject).map((a) => a.id).sort();
+  assert.deepEqual(ids, [4, 5]);
+});
