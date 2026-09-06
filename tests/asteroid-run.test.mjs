@@ -105,7 +105,7 @@ test('fairness: an already-safe candidate is returned unchanged', () => {
 });
 
 test('fairness: a candidate bearing straight down on the ship is nudged aside', () => {
-  const candidate = { id: 2, x: 0, y: 0, z: 120, r: 40 }; // close + big + dead ahead
+  const candidate = { id: 2, x: 0, y: 0, z: 30, r: 40 }; // so close there's no time to reach clear
   const ship = { x: 0, y: 0, loop: 0 };
   const out = placeSpawn(candidate, ship, sector);
   assert.notEqual(out, candidate);
