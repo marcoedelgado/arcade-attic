@@ -117,6 +117,33 @@ test('run: reach does not escalate with loop', () => {
   assert.equal(run.advance(0.016).sector.reach, SECTORS[idx].reach);
 });
 
+test('run: every sector carries a valid hazard kind and accent hue', () => {
+  const kinds = new Set(['asteroids', 'mines', 'wreckage']);
+  for (const s of SECTORS) {
+    assert.ok(kinds.has(s.kind), `${s.name} kind ${s.kind} not asteroids/mines/wreckage`);
+    assert.equal(typeof s.hue, 'number', `${s.name} hue is not a number`);
+    assert.ok(s.hue >= 0 && s.hue < 360, `${s.name} hue ${s.hue} out of [0, 360)`);
+  }
+});
+
+test('run: kind and hue do not escalate with loop', () => {
+  const run = makeRun();
+  for (let i = 0; i < SECTORS.length * 5; i++) {
+    run.advance(SECTORS[run.snapshot().sectorIndex].duration + 0.01);
+  }
+  const idx = run.snapshot().sectorIndex;
+  const eff = run.advance(0.016).sector;
+  assert.equal(eff.kind, SECTORS[idx].kind);
+  assert.equal(eff.hue, SECTORS[idx].hue);
+});
+
+test('run: snapshot exposes the current sector accent hue', () => {
+  const run = makeRun();
+  assert.equal(run.snapshot().sectorHue, SECTORS[0].hue);
+  run.advance(SECTORS[0].duration + 0.01);
+  assert.equal(run.snapshot().sectorHue, SECTORS[1].hue);
+});
+
 const sector = { speed: 320, reach: 1.3 };
 
 test('fairness: an already-safe candidate is returned unchanged', () => {

@@ -6,13 +6,13 @@
 // `reach` is a multiplier of the ship's reachable-box half-extent (NOT world
 // units): field.js sizes every spawn relative to the box game.js passes in.
 export const SECTORS = [
-  { name: 'Asteroid Belt', duration: 35, speed: 320, spawnRate: 1.4, sizeRange: [18, 44], reach: 1.4,  pattern: 'scatter' },
-  { name: 'Debris Field',  duration: 35, speed: 340, spawnRate: 1.7, sizeRange: [14, 36], reach: 1.15, pattern: 'stream' },
-  { name: 'Ring Shadow',   duration: 40, speed: 300, spawnRate: 1.2, sizeRange: [22, 52], reach: 1.3,  pattern: 'gate' },
-  { name: 'The Shoal',     duration: 40, speed: 260, spawnRate: 2.2, sizeRange: [10, 26], reach: 1.4,  pattern: 'driftfield' },
-  { name: 'Rubble Run',    duration: 45, speed: 380, spawnRate: 2.0, sizeRange: [12, 34], reach: 1.15, pattern: 'stream' },
-  { name: 'Ice Fall',      duration: 45, speed: 400, spawnRate: 1.8, sizeRange: [16, 40], reach: 1.4,  pattern: 'scatter' },
-  { name: 'Deep Dark',     duration: 50, speed: 420, spawnRate: 1.6, sizeRange: [20, 48], reach: 1.3,  pattern: 'gate' },
+  { name: 'Asteroid Belt', duration: 35, speed: 320, spawnRate: 1.4, sizeRange: [18, 44], reach: 1.4,  pattern: 'scatter',    kind: 'asteroids', hue: 255 },
+  { name: 'Debris Field',  duration: 35, speed: 340, spawnRate: 1.7, sizeRange: [14, 36], reach: 1.15, pattern: 'stream',     kind: 'wreckage',  hue: 210 },
+  { name: 'Ring Shadow',   duration: 40, speed: 300, spawnRate: 1.2, sizeRange: [22, 52], reach: 1.3,  pattern: 'gate',       kind: 'asteroids', hue: 300 },
+  { name: 'The Shoal',     duration: 40, speed: 260, spawnRate: 2.2, sizeRange: [10, 26], reach: 1.4,  pattern: 'driftfield', kind: 'mines',     hue: 165 },
+  { name: 'Rubble Run',    duration: 45, speed: 380, spawnRate: 2.0, sizeRange: [12, 34], reach: 1.15, pattern: 'stream',     kind: 'wreckage',  hue: 35  },
+  { name: 'Ice Fall',      duration: 45, speed: 400, spawnRate: 1.8, sizeRange: [16, 40], reach: 1.4,  pattern: 'scatter',    kind: 'asteroids', hue: 195 },
+  { name: 'Deep Dark',     duration: 50, speed: 420, spawnRate: 1.6, sizeRange: [20, 48], reach: 1.3,  pattern: 'gate',       kind: 'mines',     hue: 275 },
 ];
 
 // TUNABLE
@@ -34,8 +34,9 @@ export function makeRun({ reducedMotion = false } = {}) {
       ...base,
       speed: base.speed * mult * rm,
       spawnRate: Math.min(SPAWN_RATE_CAP, base.spawnRate * mult) * rm,
-      // `reach` rides through unchanged from ...base — it is relative to a fixed
-      // box, so widening it per loop would just push spawns back outside the box.
+      // `reach`, `kind` and `hue` ride through unchanged from ...base. `reach` is
+      // relative to a fixed box (widening it per loop just re-pushes spawns out);
+      // `kind` and `hue` are cosmetic — escalating them is meaningless.
     };
   }
 
@@ -58,6 +59,6 @@ export function makeRun({ reducedMotion = false } = {}) {
       };
     },
     reset() { idx = 0; loop = 0; elapsed = 0; },
-    snapshot() { return { sectorName: SECTORS[idx].name, sectorIndex: idx, loop }; },
+    snapshot() { return { sectorName: SECTORS[idx].name, sectorIndex: idx, loop, sectorHue: SECTORS[idx].hue }; },
   };
 }
