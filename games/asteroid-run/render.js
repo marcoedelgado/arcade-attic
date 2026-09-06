@@ -115,8 +115,8 @@ export function render(ctx, camera, scene, opts) {
   }
   ctx.globalAlpha = 1;
 
-  // 5. ship
-  drawShip(ctx, camera, ship, p, reducedMotion);
+  // 5. ship — hidden during 'dying' (it has shattered into debris)
+  if (!ship.destroyed) drawShip(ctx, camera, ship, p, reducedMotion);
 
   ctx.restore();
 }

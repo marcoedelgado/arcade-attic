@@ -5,10 +5,10 @@ const FONT = '600 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 const BIG = '700 40px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 
 function fmt(ms) {
-  const s = ms / 1000;
-  const m = Math.floor(s / 60);
-  const rem = (s % 60).toFixed(1).padStart(4, '0');
-  return `${m}:${rem}`;
+  const tenths = Math.round(ms / 100);
+  const m = Math.floor(tenths / 600);
+  const s = (tenths % 600) / 10;
+  return `${m}:${s.toFixed(1).padStart(4, '0')}`;
 }
 
 export function drawHud(ctx, vp, hud) {

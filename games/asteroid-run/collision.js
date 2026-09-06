@@ -3,7 +3,7 @@
 // hits; field.js and ship.js never see it.
 
 const SLAB_LO = 40;   // TUNABLE — only test asteroids with z in [SLAB_LO, SLAB_HI]
-const SLAB_HI = 90;
+const SLAB_HI = 95;
 const SHIP_R = 16;    // TUNABLE — ship collision radius in world units
 const HITBOX = 0.6;   // TUNABLE — fraction of each projected radius used for overlap (forgiving)
 

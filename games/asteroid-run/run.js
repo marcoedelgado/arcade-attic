@@ -7,7 +7,7 @@ export const SECTORS = [
   { name: 'Asteroid Belt', duration: 35, speed: 320, spawnRate: 1.4, sizeRange: [18, 44], spread: 260, pattern: 'scatter' },
   { name: 'Debris Field',  duration: 35, speed: 340, spawnRate: 1.7, sizeRange: [14, 36], spread: 280, pattern: 'stream' },
   { name: 'Ring Shadow',   duration: 40, speed: 300, spawnRate: 1.2, sizeRange: [22, 52], spread: 240, pattern: 'gate' },
-  { name: 'The Shoal',     duration: 40, speed: 360, spawnRate: 2.2, sizeRange: [10, 26], spread: 300, pattern: 'driftfield' },
+  { name: 'The Shoal',     duration: 40, speed: 260, spawnRate: 2.2, sizeRange: [10, 26], spread: 300, pattern: 'driftfield' },
   { name: 'Rubble Run',    duration: 45, speed: 380, spawnRate: 2.0, sizeRange: [12, 34], spread: 300, pattern: 'stream' },
   { name: 'Ice Fall',      duration: 45, speed: 400, spawnRate: 1.8, sizeRange: [16, 40], spread: 320, pattern: 'scatter' },
   { name: 'Deep Dark',     duration: 50, speed: 420, spawnRate: 1.6, sizeRange: [20, 48], spread: 320, pattern: 'gate' },

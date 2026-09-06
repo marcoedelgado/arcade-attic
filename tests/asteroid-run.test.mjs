@@ -105,6 +105,8 @@ test('fairness: an already-safe candidate is returned unchanged', () => {
   assert.equal(placeSpawn(candidate, ship, sector), candidate);
 });
 
+// Exercises the reachable-gap branch as a unit contract; the live spawner only
+// produces z=900, where that branch is a low-z backstop.
 test('fairness: a candidate bearing straight down on the ship is nudged aside', () => {
   const candidate = { id: 2, x: 0, y: 0, z: 30, r: 40 }; // so close there's no time to reach clear
   const ship = { x: 0, y: 0, loop: 0 };
@@ -117,9 +119,11 @@ test('fairness: near-ship suppression clears space at high loop', () => {
   const candidate = { id: 3, x: 10, y: 10, z: 600, r: 20 };
   const ship = { x: 0, y: 0, loop: 3 };
   const out = placeSpawn(candidate, ship, sector);
-  if (out !== null) {
-    assert.ok(Math.hypot(out.x - ship.x, out.y - ship.y) >= 69, 'still too close to the ship');
-  }
+  // either dropped, or moved clear of the ship bubble
+  assert.ok(
+    out === null || Math.hypot(out.x - ship.x, out.y - ship.y) >= 69,
+    `expected null or a spawn >=69 from the ship, got ${JSON.stringify(out)}`,
+  );
 });
 
 test('fairness: near-ship suppression is inactive at loop 0', () => {

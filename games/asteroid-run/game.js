@@ -14,6 +14,7 @@ const ctx = canvas.getContext('2d');
 
 const reduceMotion = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = reduceMotion(); // spec §7.4 — read once at boot
 
 /* ---------- persistence ---------- */
 function loadBest() {
@@ -48,7 +49,7 @@ const debris = [];
 const palette = readPalette();
 
 const camera = makeCamera(vp);
-const run = makeRun({ reducedMotion: reduceMotion() });
+const run = makeRun({ reducedMotion });
 let lastSector = run.advance(0).sector;   // effective sector, cached for the 'dying' branch
 const field = makeField({ rng: Math.random, asteroids, stars });
 const ship = makeShip({ camera, viewport: vp });
@@ -141,20 +142,20 @@ function frame(dt) {
     if (ship.shields <= 0) enterDying();
   } else if (state === 'dying') {
     dyingMs -= dt * 1000;
-    run.advance(dt); // field keeps moving
     field.step(dt, lastSector, { x: 0, y: 0, loop: 0 });
     stepDebris(dt);
     if (shake > 0) shake = Math.max(0, shake - dt * 20);
     if (dyingMs <= 0) enterDead();
   } else {
     // title / dead: drift the starfield only
-    field.step(dt, { speed: 40, spawnRate: 0, sizeRange: [10, 10], spread: 260, pattern: 'scatter' }, { x: 0, y: 0, loop: 0 });
+    field.step(dt, { speed: reducedMotion ? 0 : 40, spawnRate: 0, sizeRange: [10, 10], spread: 260, pattern: 'scatter' }, { x: 0, y: 0, loop: 0 });
   }
 
   // draw
   const shipSnap = ship.update(0);
   shipSnap.blink = ship.invulnerable ? (performance.now() % 1000) / 1000 : 0;
-  render(ctx, camera, { asteroids, stars, debris, ship: shipSnap, shake }, { vp, palette, reducedMotion: reduceMotion() });
+  shipSnap.destroyed = state === 'dying';
+  render(ctx, camera, { asteroids, stars, debris, ship: shipSnap, shake }, { vp, palette, reducedMotion });
   if (state === 'playing' || state === 'dying') {
     drawHud(ctx, vp, { timeMs: runMs, shields: ship.shields, sectorName, sectorProgress, bannerMs });
   }
@@ -173,6 +174,7 @@ function pointerPos(e) {
 }
 canvas.addEventListener('pointerdown', (e) => {
   launchOrRestart();
+  if (state !== 'playing') return;
   const p = pointerPos(e);
   ship.aim(p.x, p.y, p.touch ? 'touch' : 'mouse');
 });
@@ -188,11 +190,16 @@ function applyKeys() {
   ship.setThrust(Math.sign(x), Math.sign(y));
 }
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' || e.metaKey || e.ctrlKey || e.altKey) return;
   if (state === 'title' || state === 'dead') { e.preventDefault(); launchOrRestart(); return; }
   if (e.key in keys) { keys[e.key] = 1; applyKeys(); e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
   if (e.key in keys) { keys[e.key] = 0; applyKeys(); }
+});
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = 0;
+  applyKeys();
 });
 window.addEventListener('resize', sizeCanvas);
 
