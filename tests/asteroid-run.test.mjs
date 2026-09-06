@@ -226,7 +226,7 @@ test('collision: multiple simultaneous hits are all returned', () => {
 import { makeField } from '../games/asteroid-run/field.js';
 import { mulberry32 } from '../games/waffle-wednesday/shift.js';
 
-const flatSector = { speed: 300, spawnRate: 2, sizeRange: [20, 20], reach: 1.4, pattern: 'scatter' };
+const flatSector = { speed: 300, spawnRate: 2, sizeRange: [20, 20], reach: 1.4, pattern: 'scatter', kind: 'asteroids' };
 const farShip = { x: 0, y: 0, loop: 0, box: boxStub };
 
 test('field: reset fills the star array and clears asteroids', () => {
@@ -380,6 +380,33 @@ test('field: a scatter candidate lands within the box reach in x and y', () => {
   const cy = (boxStub.y0 + boxStub.y1) / 2;
   assert.ok(Math.abs(a.x) <= bhw * 1.4 + 1e-9, `x ${a.x} outside reach`);
   assert.ok(Math.abs(a.y - cy) <= (boxStub.y1 - boxStub.y0) / 2 * 1.4 + 1e-9, `y ${a.y} outside reach`);
+});
+
+test('field: a scatter candidate carries the sector hazard kind', () => {
+  const asteroids = [];
+  const field = makeField({ rng: mulberry32(8), asteroids, stars: [] });
+  field.reset();
+  field.step(1.0, { ...flatSector, spawnRate: 1, kind: 'mines' }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 1);
+  assert.equal(asteroids[0].kind, 'mines');
+});
+
+test('field: a stream candidate carries the sector hazard kind', () => {
+  const asteroids = [];
+  const field = makeField({ rng: mulberry32(11), asteroids, stars: [] });
+  field.reset();
+  field.step(1.0, { ...flatSector, pattern: 'stream', spawnRate: 1, kind: 'wreckage' }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 1);
+  assert.equal(asteroids[0].kind, 'wreckage');
+});
+
+test('field: both walls of a gate pair carry the sector hazard kind', () => {
+  const asteroids = [];
+  const field = makeField({ rng: mulberry32(5), asteroids, stars: [] });
+  field.reset();
+  field.step(1.0, { ...flatSector, pattern: 'gate', spawnRate: 1, kind: 'wreckage', sizeRange: [20, 20] }, { x: 0, y: 0, loop: 0, box: boxStub });
+  assert.equal(asteroids.length, 2);
+  assert.ok(asteroids.every((a) => a.kind === 'wreckage'), 'a gate wall is missing its kind');
 });
 
 test('field: it mutates the exact arrays it was given', () => {

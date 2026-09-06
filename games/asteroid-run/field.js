@@ -35,8 +35,8 @@ export function makeField({ rng, asteroids, stars }) {
     s.z = between(20, SPAWN_Z);
   }
 
-  function mkRock(x, y, r, vx = 0) {
-    return { id: nextId++, x, y, z: SPAWN_Z, r, spin: signed(1.5), seed: rng(), vx, vy: 0 };
+  function mkRock(x, y, r, vx = 0, kind = 'asteroids') {
+    return { id: nextId++, x, y, z: SPAWN_Z, r, spin: signed(1.5), seed: rng(), vx, vy: 0, kind };
   }
 
   function candidate(sector, box) {
@@ -47,6 +47,7 @@ export function makeField({ rng, asteroids, stars }) {
     const bhh = (box.y1 - box.y0) / 2;
     const hw = bhw * sector.reach;
     const hh = bhh * sector.reach;
+    const k = sector.kind ?? 'asteroids';
 
     // Argument evaluation order below is load-bearing: the fixed left-to-right
     // order of the signed() / between() / mkRock calls fixes the order the rng is
@@ -58,7 +59,7 @@ export function makeField({ rng, asteroids, stars }) {
         // ~STREAM_SWEEP of the way across by the time it reaches the collision slab
         const side = rng() < 0.5 ? -1 : 1;
         const vx = -side * (STREAM_SWEEP * hw) * sector.speed / (SPAWN_Z - SLAB_REF_Z);
-        return mkRock(cx + side * hw, cy + signed(hh * 0.7), between(lo, hi), vx);
+        return mkRock(cx + side * hw, cy + signed(hh * 0.7), between(lo, hi), vx, k);
       }
       case 'gate': {
         // a pair of walls bracketing a gap that wanders within the box.
@@ -71,14 +72,14 @@ export function makeField({ rng, asteroids, stars }) {
         const rL = between(lo, hi);
         const rR = between(lo, hi);
         return [
-          mkRock(gapCentre - gapHalf - rL, y, rL),
-          mkRock(gapCentre + gapHalf + rR, y, rR),
+          mkRock(gapCentre - gapHalf - rL, y, rL, 0, k),
+          mkRock(gapCentre + gapHalf + rR, y, rR, 0, k),
         ];
       }
       case 'driftfield':
       case 'scatter':
       default:
-        return mkRock(cx + signed(hw), cy + signed(hh * 0.85), between(lo, hi));
+        return mkRock(cx + signed(hw), cy + signed(hh * 0.85), between(lo, hi), 0, k);
     }
   }
 
