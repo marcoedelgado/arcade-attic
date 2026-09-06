@@ -1,6 +1,13 @@
 {
   "games": [
     {
+      "slug": "asteroid-run",
+      "title": "Asteroid Run",
+      "description": "Fly the rocket, thread the asteroid field. It only gets faster.",
+      "emoji": "🚀",
+      "added": "2026-09-06"
+    },
+    {
       "slug": "waffle-wednesday",
       "title": "Waffle Wednesday",
       "description": "Toast it right, top it faster. One shift, twenty customers, three walkouts and it's a bad Wednesday.",

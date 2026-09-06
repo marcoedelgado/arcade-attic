@@ -31,7 +31,8 @@ function saveBest(ms) {
 /* ---------- viewport ---------- */
 let vp = { width: host.clientWidth, height: host.clientHeight };
 function sizeCanvas() {
-  vp = { width: host.clientWidth, height: host.clientHeight };
+  vp.width = host.clientWidth;
+  vp.height = host.clientHeight;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = vp.width * dpr;
   canvas.height = vp.height * dpr;
@@ -74,6 +75,7 @@ function startRun() {
   runMs = 0;
   bannerMs = 0;
   shake = 0;
+  scoreWeight = 1;
   state = 'playing';
   sectorName = run.snapshot().sectorName;
 }
@@ -186,7 +188,7 @@ function applyKeys() {
   ship.setThrust(Math.sign(x), Math.sign(y));
 }
 window.addEventListener('keydown', (e) => {
-  if (state === 'title' || state === 'dead') { launchOrRestart(); return; }
+  if (state === 'title' || state === 'dead') { e.preventDefault(); launchOrRestart(); return; }
   if (e.key in keys) { keys[e.key] = 1; applyKeys(); e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
