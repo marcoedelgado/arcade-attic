@@ -169,3 +169,62 @@ test('collision: multiple simultaneous hits are all returned', () => {
   const ids = checkHits(shipAt, rocks, flatProject).map((a) => a.id).sort();
   assert.deepEqual(ids, [4, 5]);
 });
+
+import { makeField } from '../games/asteroid-run/field.js';
+import { mulberry32 } from '../games/waffle-wednesday/shift.js';
+
+const flatSector = { speed: 300, spawnRate: 2, sizeRange: [20, 20], spread: 260, pattern: 'scatter' };
+const farShip = { x: 0, y: 0, loop: 0 };
+
+test('field: reset fills the star array and clears asteroids', () => {
+  const asteroids = [{ id: 9, x: 0, y: 0, z: 5, r: 1 }];
+  const stars = [];
+  makeField({ rng: mulberry32(1), asteroids, stars }).reset();
+  assert.equal(asteroids.length, 0);
+  assert.ok(stars.length > 50);
+  for (const s of stars) assert.ok(s.z > 0 && s.z <= 900);
+});
+
+test('field: spawn rate governs how many asteroids appear', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(42), asteroids, stars });
+  field.reset();
+  field.step(1.0, flatSector, farShip); // rate 2 × 1s ⇒ 2 spawns
+  assert.equal(asteroids.length, 2);
+});
+
+test('field: asteroids age toward the camera at sector.speed and cull past CULL_Z', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(7), asteroids, stars });
+  field.reset();
+  field.step(1.0, flatSector, farShip);
+  const z0 = asteroids[0].z;
+  field.step(0.5, { ...flatSector, spawnRate: 0 }, farShip);
+  assert.ok(Math.abs(asteroids[0].z - (z0 - 150)) < 1e-6);
+  // push everything past the camera
+  field.step(10, { ...flatSector, spawnRate: 0 }, farShip);
+  assert.equal(asteroids.length, 0);
+});
+
+test('field: every candidate passes through placeSpawn (unavoidable ones get nudged)', () => {
+  const asteroids = [];
+  const stars = [];
+  // ship dead centre, high loop ⇒ near-ship suppression will move/skip anything close
+  const field = makeField({ rng: mulberry32(3), asteroids, stars });
+  field.reset();
+  field.step(1.0, { ...flatSector, spread: 5 }, { x: 0, y: 0, loop: 5 });
+  for (const a of asteroids) {
+    assert.ok(Math.hypot(a.x, a.y) >= 60, 'a spawn landed inside the ship bubble');
+  }
+});
+
+test('field: it mutates the exact arrays it was given', () => {
+  const asteroids = [];
+  const stars = [];
+  const field = makeField({ rng: mulberry32(1), asteroids, stars });
+  field.reset();
+  field.step(1.0, flatSector, farShip);
+  assert.ok(asteroids.length > 0); // same reference the test holds
+});
