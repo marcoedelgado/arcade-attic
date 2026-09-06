@@ -567,3 +567,49 @@ test('loop: stop() halts the callback', () => {
   clk.tick(16);
   assert.equal(count, 1);
 });
+
+/* ---------- fx.js ---------- */
+import { lerpHue, makeWarp } from '../games/asteroid-run/fx.js';
+
+const mod360 = (h) => ((h % 360) + 360) % 360;
+
+test('fx: lerpHue hits its endpoints', () => {
+  assert.equal(lerpHue(255, 35, 0), 255);
+  assert.equal(mod360(lerpHue(255, 35, 1)), 35);
+});
+
+test('fx: lerpHue takes the short way across 0 degrees', () => {
+  // 350 -> 10 is 20 deg forward through 0, not 340 deg backward
+  assert.equal(mod360(lerpHue(350, 10, 0.5)), 0);
+  // 10 -> 350 is 20 deg backward through 0
+  assert.equal(mod360(lerpHue(10, 350, 0.5)), 0);
+});
+
+test('fx: makeWarp blends from -> to as warpT decays to zero', () => {
+  const w = makeWarp({ warpMs: 1000 });
+  w.trigger(255, 35);
+  assert.equal(w.warpT, 1);
+  assert.equal(w.hue, 255);            // u = 1 - warpT = 0
+  w.step(0.5);
+  assert.ok(Math.abs(w.warpT - 0.5) < 1e-9);
+  assert.ok(Math.abs(w.hue - 325) < 1e-9); // lerpHue(255, 35, 0.5): d = +140, 255 + 70
+  w.step(0.5);
+  assert.equal(w.warpT, 0);
+  assert.ok(Math.abs(mod360(w.hue) - 35) < 1e-9);
+});
+
+test('fx: makeWarp.step clamps warpT at zero', () => {
+  const w = makeWarp({ warpMs: 1000 });
+  w.trigger(0, 100);
+  w.step(10);
+  assert.equal(w.warpT, 0);
+});
+
+test('fx: makeWarp.reset snaps both ends to one hue', () => {
+  const w = makeWarp();
+  w.trigger(0, 200);
+  w.reset(120);
+  assert.equal(w.warpT, 0);
+  assert.equal(w.hue, 120);
+  assert.equal(w.target, 120);
+});
