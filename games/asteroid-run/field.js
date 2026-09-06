@@ -35,8 +35,8 @@ export function makeField({ rng, asteroids, stars }) {
     s.z = between(20, SPAWN_Z);
   }
 
-  function mkRock(x, y, r, vx) {
-    return { id: nextId++, x, y, z: SPAWN_Z, r, spin: signed(1.5), seed: rng(), vx: vx || 0, vy: 0 };
+  function mkRock(x, y, r, vx = 0) {
+    return { id: nextId++, x, y, z: SPAWN_Z, r, spin: signed(1.5), seed: rng(), vx, vy: 0 };
   }
 
   function candidate(sector, box) {
@@ -48,6 +48,10 @@ export function makeField({ rng, asteroids, stars }) {
     const hw = bhw * sector.reach;
     const hh = bhh * sector.reach;
 
+    // Argument evaluation order below is load-bearing: the fixed left-to-right
+    // order of the signed() / between() / mkRock calls fixes the order the rng is
+    // consumed in, and seeded tests depend on it. Reordering args, or mkRock's
+    // params or literal keys, would reshuffle every seeded test.
     switch (sector.pattern) {
       case 'stream': {
         // spawn just outside the box on one side, drift inward so the rock is
@@ -57,21 +61,24 @@ export function makeField({ rng, asteroids, stars }) {
         return mkRock(cx + side * hw, cy + signed(hh * 0.7), between(lo, hi), vx);
       }
       case 'gate': {
-        // a pair of walls bracketing a gap that wanders within the box
+        // a pair of walls bracketing a gap that wanders within the box.
+        // Gap geometry is sized off bhw (GATE_WANDER / GATE_GAP_*); sector.reach
+        // only feeds the vertical (hh) jitter, so tuning a gate sector's reach
+        // per the run.js header has little visible effect on the gap.
         const gapCentre = cx + signed(bhw * GATE_WANDER);
         const gapHalf = bhw * between(GATE_GAP_LO, GATE_GAP_HI);
         const y = cy + signed(hh * 0.4);
         const rL = between(lo, hi);
         const rR = between(lo, hi);
         return [
-          mkRock(gapCentre - gapHalf - rL, y, rL, 0),
-          mkRock(gapCentre + gapHalf + rR, y, rR, 0),
+          mkRock(gapCentre - gapHalf - rL, y, rL),
+          mkRock(gapCentre + gapHalf + rR, y, rR),
         ];
       }
       case 'driftfield':
       case 'scatter':
       default:
-        return mkRock(cx + signed(hw), cy + signed(hh * 0.85), between(lo, hi), 0);
+        return mkRock(cx + signed(hw), cy + signed(hh * 0.85), between(lo, hi));
     }
   }
 

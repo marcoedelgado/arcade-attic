@@ -240,12 +240,17 @@ test('field: every candidate passes through placeSpawn (near-ship bubble is kept
   const field = makeField({ rng: mulberry32(3), asteroids, stars });
   field.reset();
   const clearR = Math.min(70, (boxStub.x1 - boxStub.x0) / 2 * 0.5);
-  // ship dead centre, high loop ⇒ near-ship suppression moves/skips anything close
-  field.step(1.0, { ...flatSector, reach: 0.1 }, { x: 0, y: 0, loop: 5, box: boxStub });
+  // ship at the box CENTRE (not y=0 — the box y-centre is +40.5), high loop ⇒
+  // every reach:0.1 candidate lands inside the near-ship bubble and must be
+  // nudged out to ~clearR. (At y=0 the candidates sit ~40 from the ship on their
+  // own and the assertion would pass without placeSpawn touching them.)
+  const shipY = (boxStub.y0 + boxStub.y1) / 2;
+  field.step(1.0, { ...flatSector, reach: 0.1 }, { x: 0, y: shipY, loop: 5, box: boxStub });
   for (const a of asteroids) {
+    const d = Math.hypot(a.x - 0, a.y - shipY);
     assert.ok(
-      Math.hypot(a.x - 0, a.y - 0) >= clearR - 1e-9,
-      `a spawn landed ${Math.hypot(a.x, a.y).toFixed(1)} from the ship (< ${clearR})`,
+      d >= clearR - 1e-9,
+      `a spawn landed ${d.toFixed(1)} from the ship (< ${clearR})`,
     );
   }
 });
@@ -274,6 +279,55 @@ test('field: a gate spawn emits a straddling pair with a clear central lane', ()
   assert.ok(laneWidth > 0, `no lane between the walls: ${laneWidth.toFixed(1)}`);
   const gapCentre = (a.x + b.x) / 2;
   assert.ok(Math.abs(gapCentre) <= (boxStub.x1 - boxStub.x0) / 2, 'gap centre fell outside the box');
+});
+
+test('field: both walls of a gate pair are routed through placeSpawn at high loop', () => {
+  // Proves the Array.isArray(...) fan-out in step() actually sends BOTH rocks of
+  // a gate pair through fairness — the existing gate test only runs at loop 0,
+  // where every fairness branch is inert.
+  //
+  // Seed locked to 1: with mulberry32(1) the gate() call places its left wall at
+  // x≈-40.05, y≈52.26 (right wall x≈76.76). Parking the stub ship at (-30, 40)
+  // puts that left wall ~15.9 units away — inside clearR (40) — while leaving the
+  // right wall well outside. At loop 5 branch 1 (near-ship suppression) is active,
+  // so the left wall must be shoved out to exactly clearR and the right wall left
+  // alone. If you change the seed, re-derive the ship position so a wall still
+  // lands in the bubble; do NOT relax the assertions.
+  const SEED = 1;
+  const ship = { x: -30, y: 40, loop: 5, box: boxStub };
+  const gate = { ...flatSector, pattern: 'gate', spawnRate: 1, reach: 1.3, sizeRange: [20, 20] };
+  const clearR = Math.min(70, (boxStub.x1 - boxStub.x0) / 2 * 0.5);
+
+  // raw walls: same seed, loop 0 + far ship ⇒ candidate() output untouched.
+  const rawAst = [];
+  {
+    const f = makeField({ rng: mulberry32(SEED), asteroids: rawAst, stars: [] });
+    f.reset();
+    f.step(1.0, gate, farShip);
+  }
+  const rawX = rawAst.map((a) => a.x).sort((p, q) => p - q);
+  assert.ok(
+    rawAst.some((a) => Math.hypot(a.x - ship.x, a.y - ship.y) < clearR),
+    'seed 1 no longer parks a wall inside the bubble — re-derive the ship position',
+  );
+
+  const asteroids = [];
+  const field = makeField({ rng: mulberry32(SEED), asteroids, stars: [] });
+  field.reset();
+  field.step(1.0, gate, ship);
+
+  assert.ok(asteroids.length === 1 || asteroids.length === 2, `gate placed ${asteroids.length} rocks`);
+  for (const a of asteroids) {
+    assert.ok(
+      Math.hypot(a.x - ship.x, a.y - ship.y) >= clearR - 1e-9,
+      `a gate wall landed ${Math.hypot(a.x - ship.x, a.y - ship.y).toFixed(1)} from the ship`,
+    );
+  }
+  // routing proof: at least one surviving wall was actually moved off its spawn x.
+  assert.ok(
+    asteroids.some((a) => !rawX.some((x) => Math.abs(x - a.x) < 1e-9)),
+    'no gate wall was nudged — the pair was not routed through placeSpawn',
+  );
 });
 
 test('field: step integrates a rock\'s vx into its x each frame', () => {
@@ -335,9 +389,13 @@ test('ship: movement stays inside the box', () => {
 
 test('ship: box() reports the same limits movement clamps to', () => {
   const ship = mkShip();
-  const b = ship.box();
+  const b = ship.box(); // before any update() ⇒ camera roll is still 0
   assert.ok(b.x0 < 0 && b.x1 > 0 && b.x0 === -b.x1, 'box x should be symmetric about 0');
-  assert.ok(b.y1 > b.y0, 'box y0 should be above y1');
+  assert.ok(b.y1 > b.y0, 'box y1 (screen-bottom edge) is greater in world y than box y0 (screen-top edge)');
+  assert.ok(
+    Math.abs(b.x1 - makeCamera(vp).unproject(vp.width - 30, vp.height * 0.40, 60).x) < 1e-9,
+    'box x1 should match an independent camera unproject',
+  );
   // ease the ship hard into the bottom-right corner; it should settle on the box bounds
   ship.aim(99999, 99999, 'mouse');
   let s;
