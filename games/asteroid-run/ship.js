@@ -32,13 +32,17 @@ export function makeShip({ camera, viewport }) {
   function restPos() {
     return worldAt(vp.width / 2, vp.height * REST_FRACTION);
   }
-  function clampBox(p) {
+  function boxAt() {
     const left = worldAt(BOX_X_MARGIN, vp.height * BOX_TOP);
     const right = worldAt(vp.width - BOX_X_MARGIN, vp.height * BOX_TOP);
     const top = worldAt(vp.width / 2, vp.height * BOX_TOP);
     const bottom = worldAt(vp.width / 2, vp.height * BOX_BOTTOM);
-    p.x = Math.max(left.x, Math.min(right.x, p.x));
-    p.y = Math.max(top.y, Math.min(bottom.y, p.y));
+    return { x0: left.x, x1: right.x, y0: top.y, y1: bottom.y };
+  }
+  function clampBox(p) {
+    const b = boxAt();
+    p.x = Math.max(b.x0, Math.min(b.x1, p.x));
+    p.y = Math.max(b.y0, Math.min(b.y1, p.y));
   }
 
   return {
@@ -74,6 +78,7 @@ export function makeShip({ camera, viewport }) {
     },
 
     worldPos() { return { x: pos.x, y: pos.y, z: COCKPIT_Z }; },
+    box() { return boxAt(); },
 
     hit() {
       if (invulnMs > 0) return false;

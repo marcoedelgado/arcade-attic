@@ -253,8 +253,21 @@ test('ship: movement stays inside the box', () => {
   ship.aim(99999, 99999, 'touch'); // way off-screen
   let s;
   for (let i = 0; i < 400; i++) s = ship.update(1 / 60);
-  const rightEdge = makeCamera(vp).unproject(vp.width - 30, vp.height * 0.40, 60).x;
-  assert.ok(Math.abs(s.x - rightEdge) < 1, `x ${s.x} not at box edge ${rightEdge}`);
+  const b = ship.box();
+  assert.ok(Math.abs(s.x - b.x1) < 1, `x ${s.x} not at box edge ${b.x1}`);
+});
+
+test('ship: box() reports the same limits movement clamps to', () => {
+  const ship = mkShip();
+  const b = ship.box();
+  assert.ok(b.x0 < 0 && b.x1 > 0 && b.x0 === -b.x1, 'box x should be symmetric about 0');
+  assert.ok(b.y1 > b.y0, 'box y0 should be above y1');
+  // ease the ship hard into the bottom-right corner; it should settle on the box bounds
+  ship.aim(99999, 99999, 'mouse');
+  let s;
+  for (let i = 0; i < 400; i++) s = ship.update(1 / 60);
+  assert.ok(Math.abs(s.x - b.x1) < 1, `x settled at ${s.x}, box x1 ${b.x1}`);
+  assert.ok(Math.abs(s.y - b.y1) < 1, `y settled at ${s.y}, box y1 ${b.y1}`);
 });
 
 test('ship: touch aim sits above the finger', () => {
