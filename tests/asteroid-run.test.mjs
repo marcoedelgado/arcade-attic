@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { makeCamera } from '../games/asteroid-run/camera.js';
 import { makeRun, SECTORS } from '../games/asteroid-run/run.js';
 import { placeSpawn } from '../games/asteroid-run/fairness.js';
+import { makeLoop } from '../games/asteroid-run/loop.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
@@ -310,4 +311,54 @@ test('ship: update(0) is a side-effect-free snapshot (does not reset camera roll
 
 test('ship: MAX_SPEED matches the fairness reach constant', () => {
   assert.equal(MAX_SPEED, 520);
+});
+
+function fakeClock() {
+  let t = 0;
+  let cb = null;
+  let hiddenFlag = false;
+  return {
+    now: () => t,
+    raf: (fn) => { cb = fn; return 1; },
+    caf: () => { cb = null; },
+    hidden: () => hiddenFlag,
+    setHidden(v) { hiddenFlag = v; },
+    tick(ms) { t += ms; const fn = cb; cb = null; if (fn) fn(); },
+  };
+}
+
+test('loop: dt is clamped to 50ms', () => {
+  const clk = fakeClock();
+  const seen = [];
+  const loop = makeLoop(clk);
+  loop.start((dt) => seen.push(dt));
+  clk.tick(16);   // normal frame
+  clk.tick(500);  // huge stall
+  assert.ok(Math.abs(seen[0] - 0.016) < 1e-9);
+  assert.equal(seen[1], 0.05);
+});
+
+test('loop: hidden frames are skipped and reset the baseline', () => {
+  const clk = fakeClock();
+  const seen = [];
+  const loop = makeLoop(clk);
+  loop.start((dt) => seen.push(dt));
+  clk.tick(16);
+  clk.setHidden(true);
+  clk.tick(10000); // long time in the background
+  clk.setHidden(false);
+  clk.tick(16);    // first visible frame back
+  assert.equal(seen.length, 2);
+  assert.ok(Math.abs(seen[1] - 0.016) < 1e-9, `baseline not reset: got ${seen[1]}`);
+});
+
+test('loop: stop() halts the callback', () => {
+  const clk = fakeClock();
+  let count = 0;
+  const loop = makeLoop(clk);
+  loop.start(() => { count++; });
+  clk.tick(16);
+  loop.stop();
+  clk.tick(16);
+  assert.equal(count, 1);
 });
