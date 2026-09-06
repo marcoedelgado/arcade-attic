@@ -152,6 +152,14 @@ test('collision: a grazing miss does not register', () => {
   assert.deepEqual(checkHits(shipAt, rocks, flatProject), []);
 });
 
+test('collision: the overlap threshold is pinned at the combined hitbox edge', () => {
+  // flatProject → shipRs = 16*0.6 = 9.6, astRs = 20*0.6 = 12, sum = 21.6
+  const justOutside = checkHits(shipAt, [{ id: 7, x: 22, y: 0, z: 60, r: 20 }], flatProject);
+  assert.deepEqual(justOutside, [], 'a rock 22 units away (sum is 21.6) must not hit');
+  const justInside = checkHits(shipAt, [{ id: 8, x: 21, y: 0, z: 60, r: 20 }], flatProject);
+  assert.deepEqual(justInside.map((a) => a.id), [8], 'a rock 21 units away must hit');
+});
+
 test('collision: multiple simultaneous hits are all returned', () => {
   const rocks = [
     { id: 4, x: 0, y: 0, z: 55, r: 30 },
