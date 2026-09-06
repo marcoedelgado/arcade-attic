@@ -79,14 +79,13 @@ test('run: wraps to sector index 1 and bumps loop after the last named sector', 
 
 test('run: escalation multiplies speed but respects the cap', () => {
   const run = makeRun();
-  const base = SECTORS[1].speed;
-  // clear enough loops to slam into the cap
   for (let i = 0; i < SECTORS.length * 15; i++) {
     run.advance(SECTORS[run.snapshot().sectorIndex].duration + 0.01);
   }
-  const { sector } = run.advance(0.016);
-  assert.ok(sector.speed <= base * 2.4 + 1e-6, `speed ${sector.speed} over cap`);
-  assert.ok(sector.speed > base, 'speed did not escalate at all');
+  const r = run.advance(0.016);
+  const base = SECTORS[run.snapshot().sectorIndex].speed;
+  assert.ok(r.sector.speed <= base * 2.4 + 1e-6, `speed ${r.sector.speed} over cap (base ${base})`);
+  assert.ok(r.sector.speed > base, 'speed did not escalate at all');
 });
 
 test('run: reducedMotion scales the effective sector down', () => {
