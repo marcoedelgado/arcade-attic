@@ -613,3 +613,78 @@ test('fx: makeWarp.reset snaps both ends to one hue', () => {
   assert.equal(w.hue, 120);
   assert.equal(w.target, 120);
 });
+
+/* ---------- particles.js ---------- */
+import { makeParticles } from '../games/asteroid-run/particles.js';
+
+test('particles: spawnDebris pushes n world-space particles at the point', () => {
+  const debris = [];
+  const trail = [];
+  const p = makeParticles({ rng: mulberry32(1), debris, trail });
+  p.spawnDebris({ x: 5, y: 6, z: 7 }, 4);
+  assert.equal(debris.length, 4);
+  for (const d of debris) {
+    assert.equal(d.x, 5); assert.equal(d.y, 6); assert.equal(d.z, 7);
+    assert.equal(d.life, 1);
+    assert.equal(typeof d.vx, 'number');
+    assert.equal(typeof d.vz, 'number');
+  }
+  assert.equal(trail.length, 0);
+});
+
+test('particles: spawnTrail pushes one screen-space particle near the origin', () => {
+  const debris = [];
+  const trail = [];
+  const p = makeParticles({ rng: mulberry32(2), debris, trail });
+  p.spawnTrail(100, 50, true);
+  assert.equal(trail.length, 1);
+  assert.ok(Math.abs(trail[0].x - 100) <= 5);
+  assert.equal(trail[0].y, 50);
+  assert.equal(trail[0].life, 1);
+  assert.equal(trail[0].hot, true);
+});
+
+test('particles: step decays life and culls dead particles', () => {
+  const debris = [];
+  const trail = [];
+  const p = makeParticles({ rng: mulberry32(3), debris, trail });
+  p.spawnDebris({ x: 0, y: 0, z: 0 }, 2);
+  p.spawnTrail(0, 0, false);
+  p.step(0.1);
+  assert.ok(Math.abs(debris[0].life - (1 - 0.1 * 1.4)) < 1e-9);
+  assert.ok(Math.abs(trail[0].life - (1 - 0.1 * 2.2)) < 1e-9);
+  p.step(10);
+  assert.equal(debris.length, 0);
+  assert.equal(trail.length, 0);
+});
+
+test('particles: step integrates velocity', () => {
+  const debris = [];
+  const trail = [];
+  const p = makeParticles({ rng: mulberry32(4), debris, trail });
+  p.spawnDebris({ x: 0, y: 0, z: 0 }, 1);
+  const d = debris[0];
+  const { vx, vz } = d;
+  p.step(0.5);
+  assert.ok(Math.abs(d.x - vx * 0.5) < 1e-9);
+  assert.ok(Math.abs(d.z - vz * 0.5) < 1e-9);
+});
+
+test('particles: deterministic under an injected rng', () => {
+  const a = [];
+  const b = [];
+  makeParticles({ rng: mulberry32(9), debris: a, trail: [] }).spawnDebris({ x: 0, y: 0, z: 0 }, 3);
+  makeParticles({ rng: mulberry32(9), debris: b, trail: [] }).spawnDebris({ x: 0, y: 0, z: 0 }, 3);
+  assert.deepEqual(a, b);
+});
+
+test('particles: clear empties both arrays in place', () => {
+  const debris = [];
+  const trail = [];
+  const p = makeParticles({ rng: mulberry32(5), debris, trail });
+  p.spawnDebris({ x: 0, y: 0, z: 0 }, 3);
+  p.spawnTrail(0, 0, false);
+  p.clear();
+  assert.equal(debris.length, 0);
+  assert.equal(trail.length, 0);
+});

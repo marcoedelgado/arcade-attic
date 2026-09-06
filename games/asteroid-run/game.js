@@ -5,6 +5,7 @@ import { makeShip } from './ship.js';
 import { makeLoop } from './loop.js';
 import { checkHits } from './collision.js';
 import { render, readPalette } from './render.js';
+import { makeParticles } from './particles.js';
 import { drawHud, drawOverlay } from './hud.js';
 
 const BEST_KEY = 'asteroid-run:best';
@@ -46,7 +47,9 @@ function sizeCanvas() {
 const asteroids = [];
 const stars = [];
 const debris = [];
+const trail = [];
 const palette = readPalette();
+const particles = makeParticles({ debris, trail });
 
 const camera = makeCamera(vp);
 const run = makeRun({ reducedMotion });
@@ -68,7 +71,7 @@ const DYING_MS = 1200;
 
 function startRun() {
   asteroids.length = 0;
-  debris.length = 0;
+  particles.clear();
   run.reset();
   field.reset();
   ship.reset();
@@ -85,31 +88,11 @@ function enterDying() {
   state = 'dying';
   dyingMs = DYING_MS;
   shake = 14;
-  spawnDebris(ship.worldPos(), 30);
+  particles.spawnDebris(ship.worldPos(), 30);
 }
 function enterDead() {
   state = 'dead';
   saveBest(runMs);
-}
-
-function spawnDebris(at, n) {
-  for (let i = 0; i < n; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const sp = 40 + Math.random() * 120;
-    debris.push({
-      x: at.x, y: at.y, z: at.z,
-      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, vz: 60 + Math.random() * 120,
-      life: 1,
-    });
-  }
-}
-function stepDebris(dt) {
-  for (let i = debris.length - 1; i >= 0; i--) {
-    const d = debris[i];
-    d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
-    d.life -= dt * 1.4;
-    if (d.life <= 0) debris.splice(i, 1);
-  }
 }
 
 /* ---------- frame ---------- */
@@ -131,12 +114,12 @@ function frame(dt) {
     s.loop = r.loop;
     s.box = ship.box();
     field.step(dt, r.sector, s);
-    stepDebris(dt);
+    particles.step(dt);
 
     for (const hit of checkHits(ship.worldPos(), asteroids, camera.project)) {
       const idx = asteroids.indexOf(hit);
       if (idx >= 0) asteroids.splice(idx, 1);
-      spawnDebris({ x: hit.x, y: hit.y, z: hit.z }, 12);
+      particles.spawnDebris({ x: hit.x, y: hit.y, z: hit.z }, 12);
       if (ship.hit()) shake = Math.max(shake, 8);
     }
     if (shake > 0) shake = Math.max(0, shake - dt * 40);
@@ -144,7 +127,7 @@ function frame(dt) {
   } else if (state === 'dying') {
     dyingMs -= dt * 1000;
     field.step(dt, lastSector, { x: 0, y: 0, loop: 0, box: ship.box() });
-    stepDebris(dt);
+    particles.step(dt);
     if (shake > 0) shake = Math.max(0, shake - dt * 20);
     if (dyingMs <= 0) enterDead();
   } else {
