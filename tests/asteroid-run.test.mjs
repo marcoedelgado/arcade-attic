@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeCamera } from '../games/asteroid-run/camera.js';
 import { makeRun, SECTORS } from '../games/asteroid-run/run.js';
+import { placeSpawn } from '../games/asteroid-run/fairness.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
@@ -93,4 +94,36 @@ test('run: reducedMotion scales the effective sector down', () => {
   const reduced = makeRun({ reducedMotion: true }).advance(0.016).sector;
   assert.ok(reduced.speed < plain.speed * 0.7);
   assert.ok(reduced.spawnRate < plain.spawnRate * 0.7);
+});
+
+const sector = { speed: 320, spread: 260 };
+
+test('fairness: an already-safe candidate is returned unchanged', () => {
+  const candidate = { id: 1, x: 200, y: 0, z: 900, r: 20 };
+  const ship = { x: -100, y: 0, loop: 0 };
+  assert.equal(placeSpawn(candidate, ship, sector), candidate);
+});
+
+test('fairness: a candidate bearing straight down on the ship is nudged aside', () => {
+  const candidate = { id: 2, x: 0, y: 0, z: 120, r: 40 }; // close + big + dead ahead
+  const ship = { x: 0, y: 0, loop: 0 };
+  const out = placeSpawn(candidate, ship, sector);
+  assert.notEqual(out, candidate);
+  assert.ok(Math.abs(out.x) > Math.abs(candidate.x), 'not pushed away from the ship');
+});
+
+test('fairness: near-ship suppression clears space at high loop', () => {
+  const candidate = { id: 3, x: 10, y: 10, z: 600, r: 20 };
+  const ship = { x: 0, y: 0, loop: 3 };
+  const out = placeSpawn(candidate, ship, sector);
+  if (out !== null) {
+    assert.ok(Math.hypot(out.x - ship.x, out.y - ship.y) >= 69, 'still too close to the ship');
+  }
+});
+
+test('fairness: near-ship suppression is inactive at loop 0', () => {
+  const candidate = { id: 4, x: 10, y: 10, z: 600, r: 20 };
+  const ship = { x: 0, y: 0, loop: 0 };
+  const out = placeSpawn(candidate, ship, sector);
+  assert.equal(out, candidate);
 });
