@@ -6,7 +6,7 @@
 // 20 degrees forward through 0, not 340 backward. Result is NOT wrapped to
 // [0, 360) — callers hand it to oklch(), which wraps.
 export function lerpHue(a, b, u) {
-  const d = ((b - a + 540) % 360) - 180;
+  const d = (((b - a) % 360 + 540) % 360) - 180;
   return a + d * u;
 }
 

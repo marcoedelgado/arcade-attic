@@ -1,10 +1,22 @@
 // render.js — draws one frame. Pure drawing: camera, entities, palette, fx state.
+// Obstacles are drawn far → near so nearer rocks overlap.
 const DEFAULTS = {
   bg0: '#05030f', bg1: '#160f2e', nebula: 'rgba(94,58,140,0.18)',
   star: '#dfe8ff', rock: '#7d7486', rockLit: '#c9bfd6', rockDark: '#3a3444',
   ship: '#eef1ff', shipGlow: '#6fb3ff', streak: 'rgba(160,190,255,0.35)',
   debris: '#b8a9c9',
 };
+
+// oklch() as an addColorStop() argument throws on engines that can't parse it
+// (unlike fillStyle, which silently ignores an unknown color). Probe once so the
+// gradient builders below can fall back instead of killing the frame loop.
+const OKLCH_OK = (() => {
+  try {
+    document.createElement('canvas').getContext('2d')
+      .createLinearGradient(0, 0, 1, 1).addColorStop(0, 'oklch(0.5 0.1 250)');
+    return true;
+  } catch { return false; }
+})();
 
 export function readPalette() {
   try {
@@ -43,9 +55,10 @@ function hashRng(n) {
 }
 
 // NOTE: render.js and hud.js use oklch() string literals as canvas fillStyle for
-// every hue-tinted accent. Supported in all current Chrome/Safari/Firefox; on an
-// older engine the assignment is silently ignored and the previous fillStyle is
-// kept — the tinted fills degrade to a wrong colour, never a crash.
+// every hue-tinted accent. fillStyle assignments silently no-op on old engines,
+// keeping the previous style. Gradient addColorStop() calls throw on unknown colors,
+// so drawPlanet() and drawShipHero() guard their oklch stops with OKLCH_OK and fall
+// back to rgba/hex; these paths only run on pre-2023 engines that can't parse oklch().
 
 // soft parallax planet, one per sector index — pure decoration, no gameplay effect
 function drawPlanet(ctx, vp, seedIdx, hue) {
@@ -53,8 +66,8 @@ function drawPlanet(ctx, vp, seedIdx, hue) {
   const cy = vp.height * (0.06 + hashRng(seedIdx + 1) * 0.12);
   const r = Math.min(vp.width, vp.height) * (0.15 + hashRng(seedIdx + 2) * 0.09);
   const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
-  grad.addColorStop(0, `oklch(0.42 0.06 ${hue})`);
-  grad.addColorStop(1, `oklch(0.13 0.03 ${hue})`);
+  grad.addColorStop(0, OKLCH_OK ? `oklch(0.42 0.06 ${hue})` : '#5a5269');
+  grad.addColorStop(1, OKLCH_OK ? `oklch(0.13 0.03 ${hue})` : '#1c1824');
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = grad;
@@ -220,7 +233,7 @@ export function drawShipHero(ctx, vp, p, t, hue) {
   ctx.save();
   ctx.translate(cx, cy + size * 1.7);
   const pad = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 1.8);
-  pad.addColorStop(0, `oklch(0.6 0.13 ${hue} / 0.35)`);
+  pad.addColorStop(0, OKLCH_OK ? `oklch(0.6 0.13 ${hue} / 0.35)` : 'rgba(120,110,150,0.35)');
   pad.addColorStop(1, 'transparent');
   ctx.fillStyle = pad;
   ctx.beginPath(); ctx.ellipse(0, 0, size * 1.8, size * 0.5, 0, 0, Math.PI * 2); ctx.fill();
