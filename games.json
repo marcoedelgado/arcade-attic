@@ -1,6 +1,13 @@
 {
   "games": [
     {
+      "slug": "pocket-pairs",
+      "title": "Pocket Pairs",
+      "description": "Flip two, find the match. A memory game with a squad of pocket-sized mascots.",
+      "emoji": "🎴",
+      "added": "2026-09-07"
+    },
+    {
       "slug": "asteroid-run",
       "title": "Asteroid Run",
       "description": "Fly the rocket, thread the asteroid field. It only gets faster.",
