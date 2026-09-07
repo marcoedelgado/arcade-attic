@@ -1,31 +1,35 @@
-// mascots.js — the Pocket Pairs mascot roster and per-difficulty subsets.
-// Pure data + one lookup helper. No DOM. All designs are original.
+// mascots.js — the Pocket Pairs mascot roster (16, four families of four) and
+// the random per-game selection helper. Pure data + one function. No DOM.
 
 export const MASCOTS = [
-  { id: 'spark',   name: 'Sparkrat' },     // spark rodent
-  { id: 'ember',   name: 'Emberling' },    // flame lizard
-  { id: 'sprout',  name: 'Sproutseed' },   // leaf-seed critter
-  { id: 'puddle',  name: 'Puddleshell' },  // domed-shell turtle
-  { id: 'sheriff', name: 'Sheriff Sam' },  // cowboy pull-string toy
-  { id: 'ranger',  name: 'Star Ranger' },  // space-ranger action figure
-  { id: 'piggy',   name: 'Coin Piggy' },   // piggy bank
-  { id: 'blinky',  name: 'Blinky' },       // one-eyed green fuzzball
-  { id: 'bigfoot', name: 'Big Blue' },     // large blue furry monster
-  { id: 'lurk',    name: 'Lurkle' },       // purple closet lurker
-  { id: 'blaze',   name: 'Blaze Rod' },    // flame-decal hot rod
-  { id: 'stomper', name: 'Stomper' },      // monster truck
+  { id: 'spark',     name: 'Sparkrat',     family: 'Elemental Pals' },
+  { id: 'ember',     name: 'Emberling',    family: 'Elemental Pals' },
+  { id: 'sprout',    name: 'Sproutseed',   family: 'Elemental Pals' },
+  { id: 'puddle',    name: 'Puddleshell',  family: 'Elemental Pals' },
+  { id: 'sheriff',   name: 'Sheriff Sam',  family: 'Toy-Line Heroes' },
+  { id: 'ranger',    name: 'Star Ranger',  family: 'Toy-Line Heroes' },
+  { id: 'piggy',     name: 'Coin Piggy',   family: 'Toy-Line Heroes' },
+  { id: 'springpup', name: 'Spring Pup',   family: 'Toy-Line Heroes' },
+  { id: 'blinky',    name: 'Blinky',       family: 'Tiny Helpers' },
+  { id: 'bigfoot',   name: 'Big Blue',     family: 'Tiny Helpers' },
+  { id: 'lurk',      name: 'Lurkle',       family: 'Tiny Helpers' },
+  { id: 'tinker',    name: 'Tinker',       family: 'Tiny Helpers' },
+  { id: 'blaze',     name: 'Blaze Rod',    family: 'Turbo Wheels' },
+  { id: 'stomper',   name: 'Stomper',      family: 'Turbo Wheels' },
+  { id: 'buggy',     name: 'Dune Skimmer', family: 'Turbo Wheels' },
+  { id: 'rocket',    name: 'Rocket Rig',   family: 'Turbo Wheels' },
 ];
 
-const ALL = MASCOTS.map((m) => m.id);
-
-export const SUBSETS = {
-  6:  ['spark', 'ember', 'sprout', 'sheriff', 'blinky', 'blaze'],
-  8:  ['spark', 'ember', 'sprout', 'sheriff', 'blinky', 'blaze', 'puddle', 'bigfoot'],
-  12: ALL,
-};
-
-export function mascotsFor(pairs) {
-  const set = SUBSETS[pairs];
-  if (!set) throw new Error(`no mascot subset for pairs=${pairs}`);
-  return [...set];
+// Pick `count` distinct mascot ids at random from the full roster.
+// Fisher–Yates on a copy, then the first `count`. `rng` is injectable for tests.
+export function pickMascots(count, rng = Math.random) {
+  const ids = MASCOTS.map((m) => m.id);
+  if (!Number.isInteger(count) || count < 1 || count > ids.length) {
+    throw new Error(`pickMascots: count ${count} out of range 1..${ids.length}`);
+  }
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  return ids.slice(0, count);
 }
