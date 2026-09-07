@@ -7,7 +7,7 @@ export const MAX_SPEED = 520;       // world u/s — MUST equal fairness.js SHIP
 const COCKPIT_Z = 60;               // the ship's fixed depth (the collision plane)
 const FOLLOW = 12;                  // eased-follow rate; higher = snappier, no overshoot
 const REST_FRACTION = 0.78;         // resting screen height (fraction of canvas)
-const BOX_TOP = 0.40;               // movement box, fractions of canvas height
+const BOX_TOP = 0.30;               // movement box, fractions of canvas height
 const BOX_BOTTOM = 0.92;
 const BOX_X_MARGIN = 30;            // px kept clear at the screen edges
 const TOUCH_OFFSET = 90;            // px the ship rides above a finger

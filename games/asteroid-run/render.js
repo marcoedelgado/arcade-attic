@@ -7,6 +7,11 @@ const DEFAULTS = {
   debris: '#b8a9c9',
 };
 
+// Vertical foreshortening of the in-flight ship — the body is drawn as a flat
+// plan view, so squashing it in y makes it read as seen from behind-and-above,
+// in the same perspective as the asteroid field. The hangar hero keeps 1.0.
+const SHIP_SQUASH = 0.6;
+
 // oklch() as an addColorStop() argument throws on engines that can't parse it
 // (unlike fillStyle, which silently ignores an unknown color). Probe once so the
 // gradient builders below can fall back instead of killing the frame loop.
@@ -271,6 +276,7 @@ function drawShip(ctx, camera, ship, p, reducedMotion, t, hue) {
   ctx.save();
   ctx.translate(pr.sx, pr.sy + bob);
   ctx.rotate(bank);
+  ctx.scale(1, SHIP_SQUASH); // foreshorten: chasing it from behind, not a top-down sticker
   ctx.globalAlpha = hidden ? 0.35 : 1;
   drawEngineFlare(ctx, size, p.shipGlow, flick);
   ctx.globalAlpha = 1;
