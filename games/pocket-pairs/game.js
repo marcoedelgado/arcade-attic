@@ -198,12 +198,14 @@ function onGameEnd() {
 // --- wiring ---
 el('start-btn').addEventListener('click', startGame);
 el('new-game').addEventListener('click', () => {
+  onGameEnd();               // stop the solo timer if the game was abandoned mid-play
   overlayEl.hidden = true;
   playScreen.hidden = true;
   startScreen.hidden = false;
 });
 el('again').addEventListener('click', startGame);
 el('change').addEventListener('click', () => {
+  onGameEnd();               // stop the solo timer if the game was abandoned mid-play
   overlayEl.hidden = true;
   playScreen.hidden = true;
   startScreen.hidden = false;
