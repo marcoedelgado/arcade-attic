@@ -35,13 +35,13 @@ export function spriteDataUrl(id) {
   return url;
 }
 
-export function mascotImg(id, cls = 'pp-face') {
+export function mascotImg(id, alt, cls = 'pp-face') {
   const url = spriteDataUrl(id);
   const el = document.createElement('img');
   el.className = cls;
   el.width = 96;
   el.height = 96;
-  el.alt = id;
+  el.alt = alt || id;
   if (url) el.src = url;
   return el;
 }

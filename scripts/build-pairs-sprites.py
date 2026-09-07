@@ -78,6 +78,7 @@ def main():
         "// Sources: scripts/pairs-art/*.txt  ·  palette: scripts/pairs-art/palette.txt\n"
         "export const PAIR_SPRITES = {\n  " + body + ",\n};\n",
         encoding="utf8",
+        newline="\n",
     )
     print(f"wrote {OUT_JS.relative_to(ROOT)} ({len(ids)} sprites, {OUT_JS.stat().st_size} bytes)")
 
@@ -100,7 +101,11 @@ def main():
             v = int(ch, 16)
             if v:
                 px[i % SIZE, i // SIZE] = rgb[v] + (255,)
-        sheet.paste(spr.resize((cell, cell), Image.NEAREST), (cx, cy))
+        # match the in-game reveal panel (--panel-bright #2b2350) so art is
+        # judged on the background it actually renders against.
+        draw.rectangle((cx, cy, cx + cell - 1, cy + cell - 1), fill=(43, 35, 80, 255))
+        resized = spr.resize((cell, cell), Image.NEAREST)
+        sheet.paste(resized, (cx, cy), resized)
         draw.text((cx, cy + cell + 3), sid, fill=(240, 240, 248, 255))
     sheet.save(OUT_PNG)
     print(f"wrote {OUT_PNG.relative_to(ROOT)}")

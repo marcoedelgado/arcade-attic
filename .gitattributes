@@ -1,0 +1,2 @@
+scripts/pairs-art/*.txt text eol=lf
+games/pocket-pairs/sprites-data.js text eol=lf

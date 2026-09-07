@@ -2,6 +2,7 @@
 // or timers. All rules live in engine.js.
 import { createGame, winnerOf } from './engine.js';
 import { mascotImg } from './sprites.js';
+import { MASCOTS } from './mascots.js';
 
 const MODES = {
   easy:   { pairs: 6,  cols: 4 },
@@ -9,6 +10,7 @@ const MODES = {
   hard:   { pairs: 12, cols: 6 },
 };
 const MISMATCH_MS = 800;
+const NAMES = new Map(MASCOTS.map((m) => [m.id, m.name]));
 
 const el = (id) => document.getElementById(id);
 const startScreen = el('start');
@@ -24,6 +26,8 @@ let players = 1;
 let busy = false;     // UI lock during the mismatch delay
 let startedAt = 0;
 let tickId = 0;
+let pendingFlip = 0;  // setTimeout id for the pending mismatch flip-back
+let cardEls = [];     // the card <button>s, built once per game
 let newBest = false;
 
 function chosen(name) {
@@ -66,6 +70,8 @@ function mmss(total) {
 }
 
 function startGame() {
+  clearTimeout(pendingFlip);
+  pendingFlip = 0;
   mode = MODES[chosen('mode')];
   players = Number(chosen('players'));
   game = createGame({ pairs: mode.pairs, players });
@@ -74,22 +80,25 @@ function startGame() {
   overlayEl.hidden = true;
   startScreen.hidden = true;
   playScreen.hidden = false;
-  onGameStart();          // hook for Task 9 (timer)
+  onGameStart();          // reset the solo timer + best-score flag
+  buildBoard();
   render();
 }
 
 function render() {
-  renderBoard();
+  syncBoard();
   renderHud(game.state());
 }
 
-function renderBoard() {
+// Build the card buttons once per game. Later renders only mutate them, so the
+// CSS flip transition fires on an element that already existed and keyboard
+// focus survives a flip.
+function buildBoard() {
   boardEl.innerHTML = '';
-  game.cards.forEach((card, i) => {
+  cardEls = game.cards.map((card, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `pp-card${card.faceUp ? ' up' : ''}${card.matched ? ' matched' : ''}`;
-    btn.disabled = busy || card.faceUp || card.matched || game.state().won;
+    btn.className = 'pp-card';
 
     const inner = document.createElement('span');
     inner.className = 'pp-card-inner';
@@ -98,12 +107,28 @@ function renderBoard() {
     cover.textContent = '?';
     const reveal = document.createElement('span');
     reveal.className = 'pp-reveal';
-    if (card.faceUp || card.matched) reveal.appendChild(mascotImg(card.mascot));
     inner.append(cover, reveal);
     btn.appendChild(inner);
 
     btn.addEventListener('click', () => onFlip(i));
     boardEl.appendChild(btn);
+    return btn;
+  });
+}
+
+function syncBoard() {
+  const state = game.state();
+  game.cards.forEach((card, i) => {
+    const btn = cardEls[i];
+    btn.classList.toggle('up', card.faceUp);
+    btn.classList.toggle('matched', card.matched);
+    btn.disabled = busy || card.faceUp || card.matched || state.won;
+    if (card.faceUp || card.matched) {
+      const reveal = btn.querySelector('.pp-reveal');
+      if (!reveal.firstChild) {
+        reveal.appendChild(mascotImg(card.mascot, NAMES.get(card.mascot)));
+      }
+    }
   });
 }
 
@@ -112,7 +137,7 @@ function renderHud(state) {
   if (state.players === 1) {
     hudEl.append(chip(`Moves ${state.moves}`), chip(`Time ${mmss(elapsed())}`));
   } else {
-    renderHud2p(state);   // added in Task 10
+    renderHud2p(state);   // 2-player HUD
   }
 }
 
@@ -142,7 +167,7 @@ function result2p(state) {
 function onFlip(index) {
   if (busy) return;
   game.flip(index);
-  onFirstFlip();             // hook for Task 9 (start timer)
+  onFirstFlip();             // start the solo timer on the first flip
   render();
   if (!game.isLocked()) return;
 
@@ -154,8 +179,9 @@ function onFlip(index) {
     afterResolve(game.state());
   } else {
     busy = true;
-    renderBoard();           // disable all cards during the pause
-    setTimeout(() => {
+    syncBoard();             // disable all cards during the pause
+    pendingFlip = setTimeout(() => {
+      pendingFlip = 0;
       game.resolve();
       busy = false;
       render();
@@ -179,7 +205,7 @@ function afterResolve(state) {
 
 function maybeEndGame(state) {
   if (!state.won) return;
-  onGameEnd();               // hook for Task 9 (stop timer)
+  onGameEnd();               // stop the solo timer
   resultEl.textContent = resultText(state);
   overlayEl.hidden = false;
 }
@@ -189,15 +215,17 @@ function resultText(state) {
     const line = `Cleared in ${state.moves} moves · ${mmss(elapsed())}`;
     return newBest ? `New best!\n${line}` : line;
   }
-  return result2p(state);   // added in Task 10
+  return result2p(state);   // 2-player result line
 }
 
-// --- lifecycle hooks ---
+// --- lifecycle hooks: solo timer + pending-flip cleanup ---
 function onGameStart() {
   startedAt = 0;
   newBest = false;
   clearInterval(tickId);
   tickId = 0;
+  clearTimeout(pendingFlip);
+  pendingFlip = 0;
 }
 
 function onFirstFlip() {
@@ -209,6 +237,8 @@ function onFirstFlip() {
 function onGameEnd() {
   clearInterval(tickId);
   tickId = 0;
+  clearTimeout(pendingFlip);
+  pendingFlip = 0;
 }
 
 // --- wiring ---

@@ -5,7 +5,7 @@ export const MASCOTS = [
   { id: 'spark',   name: 'Sparkrat' },     // spark rodent
   { id: 'ember',   name: 'Emberling' },    // flame lizard
   { id: 'sprout',  name: 'Sproutseed' },   // leaf-seed critter
-  { id: 'puddle',  name: 'Puddleshell' },  // blue turtle
+  { id: 'puddle',  name: 'Puddleshell' },  // domed-shell turtle
   { id: 'sheriff', name: 'Sheriff Sam' },  // cowboy pull-string toy
   { id: 'ranger',  name: 'Star Ranger' },  // space-ranger action figure
   { id: 'piggy',   name: 'Coin Piggy' },   // piggy bank
