@@ -62,6 +62,8 @@ test('deck: pairs*2 cards, every mascot appears exactly twice', () => {
     for (const c of g.cards) counts[c.mascot] = (counts[c.mascot] ?? 0) + 1;
     const mascots = Object.keys(counts);
     assert.equal(mascots.length, pairs);
+    const roster = new Set(MASCOTS.map((m) => m.id));
+    for (const m of mascots) assert.ok(roster.has(m), `${m} not in roster`);
     for (const m of mascots) assert.equal(counts[m], 2, `${m} not a pair`);
   }
 });
@@ -75,16 +77,23 @@ test('deck: cards carry id = array index, start face-down and unmatched', () => 
   });
 });
 
-test('shuffle: different seeds give different orders, same multiset', () => {
-  const a = createGame({ pairs: 12, players: 1, rng: seededRng(1) }).cards.map((c) => c.mascot);
-  const b = createGame({ pairs: 12, players: 1, rng: seededRng(999) }).cards.map((c) => c.mascot);
-  assert.notDeepEqual(a, b);
-  assert.deepEqual([...a].sort(), [...b].sort());
+test('deck: different seeds give different boards, each a valid pair set', () => {
+  const boardOf = (seed) => createGame({ pairs: 12, players: 1, rng: seededRng(seed) }).cards.map((c) => c.mascot);
+  const a = boardOf(1);
+  const b = boardOf(777);
+  assert.notDeepEqual(a, b, 'different seed → different board');
+  for (const board of [a, b]) {
+    const counts = {};
+    for (const m of board) counts[m] = (counts[m] ?? 0) + 1;
+    assert.equal(Object.keys(counts).length, 12, '12 distinct mascots');
+    for (const m of Object.keys(counts)) assert.equal(counts[m], 2);
+  }
 });
 
 test('createGame: rejects bad pairs / players', () => {
   assert.throws(() => createGame({ pairs: 5, players: 1 }), /pairs/);
   assert.throws(() => createGame({ pairs: 8, players: 3 }), /players/);
+  assert.throws(() => createGame({ pairs: 20, players: 1 }), /pairs/);
 });
 
 test('flip: reveals a card; second distinct flip locks the board', () => {
