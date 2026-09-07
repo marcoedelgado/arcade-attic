@@ -139,6 +139,7 @@
   line-height: 1.6;
   color: var(--neon);
   margin: 0 0 18px;
+  white-space: pre-line;
 }
 .pp-overlay-actions {
   display: flex;

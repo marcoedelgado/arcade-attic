@@ -22,9 +22,47 @@ let game = null;
 let mode = null;      // { pairs, cols }
 let players = 1;
 let busy = false;     // UI lock during the mismatch delay
+let startedAt = 0;
+let tickId = 0;
+let newBest = false;
 
 function chosen(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
+}
+
+function bestKey(m) {
+  const rows = (m.pairs * 2) / m.cols;
+  return `pocket-pairs:best:${m.cols}x${rows}`;
+}
+
+function readBest(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (typeof v?.moves === 'number' && typeof v?.seconds === 'number') return v;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function writeBest(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
+function isBetter(a, b) {
+  if (!b) return true;
+  if (a.moves !== b.moves) return a.moves < b.moves;
+  return a.seconds < b.seconds;
+}
+
+function elapsed() {
+  return startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+}
+
+function mmss(total) {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function startGame() {
@@ -69,8 +107,20 @@ function renderBoard() {
   });
 }
 
-function renderHud() {
-  hudEl.textContent = '';   // replaced in Tasks 9 and 10
+function renderHud(state) {
+  hudEl.textContent = '';
+  if (state.players === 1) {
+    hudEl.append(chip(`Moves ${state.moves}`), chip(`Time ${mmss(elapsed())}`));
+  } else {
+    renderHud2p(state);   // added in Task 10
+  }
+}
+
+function chip(text, active = false) {
+  const span = document.createElement('span');
+  span.className = `pp-chip${active ? ' active' : ''}`;
+  span.textContent = text;
+  return span;
 }
 
 function onFlip(index) {
@@ -99,7 +149,16 @@ function onFlip(index) {
 }
 
 function afterResolve(state) {
-  maybeEndGame(state);       // Tasks 9/10 add scoring/best-score work before this
+  if (state.won && state.players === 1) {
+    const key = bestKey(mode);
+    const result = { moves: state.moves, seconds: elapsed() };
+    const prev = readBest(key);
+    if (isBetter(result, prev)) {
+      writeBest(key, result);
+      newBest = true;
+    }
+  }
+  maybeEndGame(state);
 }
 
 function maybeEndGame(state) {
@@ -109,14 +168,32 @@ function maybeEndGame(state) {
   overlayEl.hidden = false;
 }
 
-function resultText() {
-  return 'Well done!';       // replaced in Tasks 9 and 10
+function resultText(state) {
+  if (state.players === 1) {
+    const line = `Cleared in ${state.moves} moves · ${mmss(elapsed())}`;
+    return newBest ? `New best!\n${line}` : line;
+  }
+  return result2p(state);   // added in Task 10
 }
 
-// --- lifecycle hooks, filled by later tasks ---
-function onGameStart() {}
-function onFirstFlip() {}
-function onGameEnd() {}
+// --- lifecycle hooks ---
+function onGameStart() {
+  startedAt = 0;
+  newBest = false;
+  clearInterval(tickId);
+  tickId = 0;
+}
+
+function onFirstFlip() {
+  if (players !== 1 || startedAt) return;
+  startedAt = Date.now();
+  tickId = setInterval(() => renderHud(game.state()), 1000);
+}
+
+function onGameEnd() {
+  clearInterval(tickId);
+  tickId = 0;
+}
 
 // --- wiring ---
 el('start-btn').addEventListener('click', startGame);
