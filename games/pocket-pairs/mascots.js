@@ -24,7 +24,10 @@ export const MASCOTS = [
 // Fisher–Yates on a copy, then the first `count`. `rng` is injectable for tests.
 export function pickMascots(count, rng = Math.random) {
   const ids = MASCOTS.map((m) => m.id);
-  if (!Number.isInteger(count) || count < 1 || count > ids.length) {
+  if (!Number.isInteger(count)) {
+    throw new Error(`pickMascots: count must be an integer, got ${count}`);
+  }
+  if (count < 1 || count > ids.length) {
     throw new Error(`pickMascots: count ${count} out of range 1..${ids.length}`);
   }
   for (let i = ids.length - 1; i > 0; i--) {

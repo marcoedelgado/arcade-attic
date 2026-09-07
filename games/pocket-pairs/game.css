@@ -97,10 +97,11 @@
   color: var(--neon-blue);
   font-family: var(--font-display);
   font-size: 18px;
-  background:
-    repeating-linear-gradient(45deg,  var(--panel-bright) 0 6px, transparent 6px 12px),
-    repeating-linear-gradient(-45deg, var(--panel-bright) 0 6px, transparent 6px 12px),
-    var(--panel);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--panel) 0 6px,
+    var(--panel-bright) 6px 12px
+  );
   text-shadow: 2px 2px 0 var(--attic-deep);
 }
 .pp-reveal {
@@ -126,12 +127,12 @@
   content: '';
   position: absolute;
   inset: 5px;
-  border-radius: 2px;
   background:
-    radial-gradient(circle at 0 0,        var(--neon-green) 0 2px, transparent 2px),
-    radial-gradient(circle at 100% 0,     var(--neon-green) 0 2px, transparent 2px),
-    radial-gradient(circle at 0 100%,     var(--neon-green) 0 2px, transparent 2px),
-    radial-gradient(circle at 100% 100%,  var(--neon-green) 0 2px, transparent 2px);
+    radial-gradient(circle at 2px 2px,                     var(--neon-green) 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 2px) 2px,        var(--neon-green) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 2px calc(100% - 2px),        var(--neon-green) 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 2px) calc(100% - 2px), var(--neon-green) 0 2px, transparent 2.5px);
+  background-repeat: no-repeat;
   pointer-events: none;
 }
 .pp-face {

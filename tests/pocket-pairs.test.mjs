@@ -237,4 +237,7 @@ test('PAIR_SPRITES: one sprite per mascot in the roster', () => {
   for (const m of MASCOTS) {
     assert.ok(PAIR_SPRITES[m.id], `no sprite for ${m.id}`);
   }
+  for (const id of Object.keys(PAIR_SPRITES)) {
+    assert.ok(MASCOTS.some((m) => m.id === id), `orphan sprite: ${id}`);
+  }
 });

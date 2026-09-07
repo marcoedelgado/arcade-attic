@@ -40,6 +40,8 @@ def expand(sp):
                 grid[y][SIZE - 1 - x] = c
     for k, row in sp.get("extra", {}).items():
         y = int(k)
+        if not (0 <= y < SIZE):
+            raise SystemExit(f"{sp['id']}: extra key {k!r} out of range 0..{SIZE - 1}")
         for x in range(SIZE):
             c = row[x] if x < len(row) else "."
             if c and c != ".":
