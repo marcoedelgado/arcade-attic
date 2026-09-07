@@ -217,9 +217,9 @@ test('winnerOf: higher score wins, tie is null', () => {
 
 import { PAIR_SPRITES } from '../games/pocket-pairs/sprites-data.js';
 
-test('PAIR_SPRITES: >=12 sprites, each 32x32 with in-range palette indices', () => {
+test('PAIR_SPRITES: >=16 sprites, each 32x32 with in-range palette indices', () => {
   const ids = Object.keys(PAIR_SPRITES);
-  assert.ok(ids.length >= 12, `only ${ids.length} sprites`);
+  assert.ok(ids.length >= 16, `only ${ids.length} sprites`);
   for (const id of ids) {
     const s = PAIR_SPRITES[id];
     assert.equal(s.w, 32);
