@@ -196,3 +196,27 @@ test('winnerOf: higher score wins, tie is null', () => {
   assert.equal(winnerOf([3, 9]), 1);
   assert.equal(winnerOf([6, 6]), null);
 });
+
+import { PAIR_SPRITES } from '../games/pocket-pairs/sprites-data.js';
+
+test('PAIR_SPRITES: >=12 sprites, each 32x32 with in-range palette indices', () => {
+  const ids = Object.keys(PAIR_SPRITES);
+  assert.ok(ids.length >= 12, `only ${ids.length} sprites`);
+  for (const id of ids) {
+    const s = PAIR_SPRITES[id];
+    assert.equal(s.w, 32);
+    assert.equal(s.h, 32);
+    assert.equal(s.pixels.length, 1024, `${id}: ${s.pixels.length} pixels`);
+    assert.equal(s.palette[0], null, `${id}: palette[0] must be transparent`);
+    for (const ch of s.pixels) {
+      const v = parseInt(ch, 16);
+      assert.ok(Number.isInteger(v) && v >= 0 && v < s.palette.length, `${id}: bad index ${ch}`);
+    }
+  }
+});
+
+test('PAIR_SPRITES: one sprite per mascot in the roster', () => {
+  for (const m of MASCOTS) {
+    assert.ok(PAIR_SPRITES[m.id], `no sprite for ${m.id}`);
+  }
+});
