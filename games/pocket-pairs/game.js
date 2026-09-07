@@ -135,7 +135,11 @@ function syncBoard() {
 function renderHud(state) {
   hudEl.textContent = '';
   if (state.players === 1) {
-    hudEl.append(chip(`Moves ${state.moves}`), chip(`Time ${mmss(elapsed())}`));
+    hudEl.append(
+      chip(`Moves ${state.moves}`),
+      chip(`Pairs ${state.matchedPairs}/${state.totalPairs}`),
+      chip(`Time ${mmss(elapsed())}`),
+    );
   } else {
     renderHud2p(state);   // 2-player HUD
   }
