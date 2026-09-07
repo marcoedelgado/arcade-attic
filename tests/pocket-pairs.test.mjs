@@ -33,3 +33,79 @@ test('mascotsFor: returns a copy, throws on unknown size', () => {
   assert.throws(() => mascotsFor(10), /10/);
   assert.throws(() => mascotsFor(), /pairs/);
 });
+
+import { createGame } from '../games/pocket-pairs/engine.js';
+
+// Deterministic RNG: cycles through a fixed list of fractions in [0,1).
+function seededRng(seed = 1) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+test('deck: pairs*2 cards, every mascot appears exactly twice', () => {
+  for (const pairs of [6, 8, 12]) {
+    const g = createGame({ pairs, players: 1, rng: seededRng(pairs) });
+    assert.equal(g.cards.length, pairs * 2);
+    const counts = {};
+    for (const c of g.cards) counts[c.mascot] = (counts[c.mascot] ?? 0) + 1;
+    const mascots = Object.keys(counts);
+    assert.equal(mascots.length, pairs);
+    for (const m of mascots) assert.equal(counts[m], 2, `${m} not a pair`);
+  }
+});
+
+test('deck: cards carry id = array index, start face-down and unmatched', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(3) });
+  g.cards.forEach((c, i) => {
+    assert.equal(c.id, i);
+    assert.equal(c.faceUp, false);
+    assert.equal(c.matched, false);
+  });
+});
+
+test('shuffle: different seeds give different orders, same multiset', () => {
+  const a = createGame({ pairs: 12, players: 1, rng: seededRng(1) }).cards.map((c) => c.mascot);
+  const b = createGame({ pairs: 12, players: 1, rng: seededRng(999) }).cards.map((c) => c.mascot);
+  assert.notDeepEqual(a, b);
+  assert.deepEqual([...a].sort(), [...b].sort());
+});
+
+test('createGame: rejects bad pairs / players', () => {
+  assert.throws(() => createGame({ pairs: 5, players: 1 }), /pairs/);
+  assert.throws(() => createGame({ pairs: 8, players: 3 }), /players/);
+});
+
+test('flip: reveals a card; second distinct flip locks the board', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(7) });
+  g.flip(0);
+  assert.equal(g.cards[0].faceUp, true);
+  assert.equal(g.isLocked(), false);
+  g.flip(1);
+  assert.equal(g.cards[1].faceUp, true);
+  assert.equal(g.isLocked(), true);
+});
+
+test('flip: no-ops for same card, matched card, third flip, bad index', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(7) });
+  g.flip(0);
+  g.flip(0); // same card again
+  assert.equal(g.cards.filter((c) => c.faceUp).length, 1);
+  g.flip(1); // locked now
+  g.flip(2); // third flip ignored
+  assert.equal(g.cards[2].faceUp, false);
+  g.flip(-1); // bad index ignored
+  g.flip(999);
+  assert.equal(g.cards.filter((c) => c.faceUp).length, 2);
+});
+
+test('flip: solo move counter ticks on the second card, not the first', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(7) });
+  assert.equal(g.state().moves, 0);
+  g.flip(0);
+  assert.equal(g.state().moves, 0);
+  g.flip(1);
+  assert.equal(g.state().moves, 1);
+});
