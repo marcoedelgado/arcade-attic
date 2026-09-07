@@ -1,0 +1,151 @@
+/* Pocket Pairs — board, card flip, start screen, HUD, overlay.
+   Uses the shared tokens from assets/styles.css. */
+
+.pp-start {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 360px;
+  margin: 8px auto 0;
+}
+.pp-choice {
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+}
+.pp-choice legend {
+  font-family: var(--font-display);
+  font-size: 10px;
+  color: var(--neon);
+  padding: 0 6px;
+}
+.pp-choice label {
+  display: block;
+  padding: 5px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pp-start .aa-btn { align-self: center; }
+
+/* HUD */
+.pp-hud {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-height: 34px;
+  margin-bottom: 14px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--ink);
+}
+.pp-chip {
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 7px 10px;
+}
+.pp-chip.active {
+  border-color: var(--neon);
+  color: var(--neon);
+}
+
+/* Board */
+.pp-board {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 4), 1fr);
+  gap: 10px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.pp-card {
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 700px;
+}
+.pp-card:disabled { cursor: default; }
+.pp-card-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.35s ease;
+  transform-style: preserve-3d;
+}
+.pp-card.up .pp-card-inner,
+.pp-card.matched .pp-card-inner { transform: rotateY(180deg); }
+
+.pp-cover,
+.pp-reveal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  backface-visibility: hidden;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.pp-cover {
+  background: linear-gradient(155deg, var(--panel-bright), var(--panel));
+  color: var(--neon);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+.pp-reveal {
+  background: var(--panel-bright);
+  transform: rotateY(180deg);
+}
+.pp-card.matched .pp-reveal { border-color: var(--neon-green); }
+.pp-face {
+  width: 84%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.pp-actions { text-align: center; margin-top: 20px; }
+
+/* Win overlay */
+.pp-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 12, 30, 0.78);
+  z-index: 10;
+}
+.pp-overlay-card {
+  text-align: center;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel-bright), var(--panel));
+  box-shadow: var(--shadow);
+  padding: 26px 28px;
+  max-width: 320px;
+}
+.pp-result {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--neon);
+  margin: 0 0 18px;
+}
+.pp-overlay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pp-ghost {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+@media (max-width: 420px) {
+  .pp-board { gap: 7px; }
+  .pp-cover { font-size: 14px; }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pocket Pairs · Arcade Attic</title>
+  <link rel="icon" href="../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <main class="aa-game">
+    <div class="aa-game-top">
+      <a class="aa-back" href="../../">← The Attic</a>
+      <h1 class="aa-game-title">Pocket Pairs</h1>
+    </div>
+
+    <section class="pp-start" id="start">
+      <fieldset class="pp-choice">
+        <legend>Board size</legend>
+        <label><input type="radio" name="mode" value="easy"> Easy · 4×3</label>
+        <label><input type="radio" name="mode" value="medium" checked> Medium · 4×4</label>
+        <label><input type="radio" name="mode" value="hard"> Hard · 6×4</label>
+      </fieldset>
+      <fieldset class="pp-choice">
+        <legend>Players</legend>
+        <label><input type="radio" name="players" value="1" checked> 1 player</label>
+        <label><input type="radio" name="players" value="2"> 2 players</label>
+      </fieldset>
+      <button class="aa-btn" id="start-btn" type="button">Start</button>
+    </section>
+
+    <section class="pp-play" id="play" hidden>
+      <div class="pp-hud" id="hud"></div>
+      <div class="pp-board" id="board"></div>
+      <div class="pp-actions">
+        <button class="aa-btn" id="new-game" type="button">New game</button>
+      </div>
+    </section>
+
+    <div class="pp-overlay" id="overlay" hidden>
+      <div class="pp-overlay-card">
+        <p class="pp-result" id="result"></p>
+        <div class="pp-overlay-actions">
+          <button class="aa-btn" id="again" type="button">Play again</button>
+          <button class="aa-btn pp-ghost" id="change" type="button">Change settings</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
