@@ -123,6 +123,22 @@ function chip(text, active = false) {
   return span;
 }
 
+function renderHud2p(state) {
+  const [s1, s2] = state.scores;
+  hudEl.append(
+    chip(`P1  ${s1}`, state.turn === 0),
+    chip(`P2  ${s2}`, state.turn === 1),
+    chip(`Player ${state.turn + 1}'s turn`),
+  );
+}
+
+function result2p(state) {
+  const [s1, s2] = state.scores;
+  const w = winnerOf(state.scores);
+  if (w === null) return `It's a tie! ${s1}–${s2}`;
+  return w === 0 ? `Player 1 wins ${s1}–${s2}` : `Player 2 wins ${s2}–${s1}`;
+}
+
 function onFlip(index) {
   if (busy) return;
   game.flip(index);
