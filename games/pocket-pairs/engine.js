@@ -33,7 +33,19 @@ export function createGame({ pairs, players, rng = Math.random }) {
   }
 
   function resolve() {
-    // Filled in Task 3.
+    const up = upCards();
+    if (up.length !== 2) return;
+    const [a, b] = up;
+    if (a.mascot === b.mascot) {
+      a.matched = true;
+      b.matched = true;
+      if (players === 2) scores[turn] += 1;
+      if (matchedPairs() === pairs) won = true;
+    } else {
+      a.faceUp = false;
+      b.faceUp = false;
+      if (players === 2) turn ^= 1;
+    }
   }
 
   function state() {
@@ -49,4 +61,9 @@ export function createGame({ pairs, players, rng = Math.random }) {
   }
 
   return { cards, flip, resolve, isLocked, state };
+}
+
+export function winnerOf(scores) {
+  if (scores[0] === scores[1]) return null;
+  return scores[0] > scores[1] ? 0 : 1;
 }

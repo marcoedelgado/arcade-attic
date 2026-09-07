@@ -109,3 +109,90 @@ test('flip: solo move counter ticks on the second card, not the first', () => {
   g.flip(1);
   assert.equal(g.state().moves, 1);
 });
+
+import { winnerOf } from '../games/pocket-pairs/engine.js';
+
+// Reveal the two cards of the first still-unmatched mascot on the board.
+function flipMatchingPair(g) {
+  const mascot = g.cards.find((c) => !c.matched).mascot;
+  const [a, b] = g.cards.filter((c) => c.mascot === mascot);
+  g.flip(a.id);
+  g.flip(b.id);
+}
+
+// Reveal two cards of different mascots.
+function flipMismatch(g) {
+  const first = g.cards.find((c) => !c.matched && !c.faceUp);
+  const other = g.cards.find((c) => !c.matched && !c.faceUp && c.mascot !== first.mascot);
+  g.flip(first.id);
+  g.flip(other.id);
+}
+
+test('resolve: match latches both cards face-up and matched', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(2) });
+  flipMatchingPair(g);
+  g.resolve();
+  const up = g.cards.filter((c) => c.matched);
+  assert.equal(up.length, 2);
+  assert.ok(up.every((c) => c.faceUp));
+  assert.equal(g.isLocked(), false);
+});
+
+test('resolve: mismatch flips both back down', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(2) });
+  flipMismatch(g);
+  assert.equal(g.isLocked(), true);
+  g.resolve();
+  assert.equal(g.cards.filter((c) => c.faceUp).length, 0);
+  assert.equal(g.isLocked(), false);
+});
+
+test('resolve: no-op when not exactly two cards are up', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(2) });
+  g.resolve(); // nothing up
+  g.flip(0);
+  g.resolve(); // one up
+  assert.equal(g.cards[0].faceUp, true);
+});
+
+test('2-player: match scores the active player and keeps their turn', () => {
+  const g = createGame({ pairs: 6, players: 2, rng: seededRng(4) });
+  assert.equal(g.state().turn, 0);
+  flipMatchingPair(g);
+  g.resolve();
+  assert.deepEqual(g.state().scores, [1, 0]);
+  assert.equal(g.state().turn, 0);
+  assert.equal(g.state().moves, 0, '2-player mode does not count moves');
+});
+
+test('2-player: mismatch passes the turn, no score', () => {
+  const g = createGame({ pairs: 6, players: 2, rng: seededRng(4) });
+  flipMismatch(g);
+  g.resolve();
+  assert.deepEqual(g.state().scores, [0, 0]);
+  assert.equal(g.state().turn, 1);
+  flipMismatch(g);
+  g.resolve();
+  assert.equal(g.state().turn, 0);
+});
+
+test('win: only true once every pair is matched; flips then no-op', () => {
+  const g = createGame({ pairs: 6, players: 1, rng: seededRng(5) });
+  for (let i = 0; i < 5; i++) {
+    flipMatchingPair(g);
+    g.resolve();
+    assert.equal(g.state().won, false);
+  }
+  flipMatchingPair(g);
+  g.resolve();
+  assert.equal(g.state().won, true);
+  assert.equal(g.state().matchedPairs, 6);
+  g.flip(0); // ignored after win
+  assert.equal(g.cards.filter((c) => c.faceUp && !c.matched).length, 0);
+});
+
+test('winnerOf: higher score wins, tie is null', () => {
+  assert.equal(winnerOf([7, 5]), 0);
+  assert.equal(winnerOf([3, 9]), 1);
+  assert.equal(winnerOf([6, 6]), null);
+});
