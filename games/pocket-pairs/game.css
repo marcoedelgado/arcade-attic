@@ -119,6 +119,11 @@
   background: rgba(15, 12, 30, 0.78);
   z-index: 10;
 }
+
+/* Guard display: flex/grid against the [hidden] attribute */
+.pp-start[hidden],
+.pp-play[hidden],
+.pp-overlay[hidden] { display: none; }
 .pp-overlay-card {
   text-align: center;
   border: 3px solid var(--ink);
