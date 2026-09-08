@@ -3,12 +3,12 @@
 // resolve() when it elapses. Shuffle takes an injectable rng for tests.
 import { pickMascots } from './mascots.js';
 
-export function createGame({ pairs, players, rng = Math.random }) {
+export function createGame({ pairs, players, rng = Math.random, pool }) {
   if (![6, 8, 12].includes(pairs)) throw new Error(`unsupported pairs=${pairs}`);
   if (![1, 2].includes(players)) throw new Error(`unsupported players=${players}`);
 
   const deck = [];
-  for (const mascot of pickMascots(pairs, rng)) deck.push({ mascot }, { mascot });
+  for (const mascot of pickMascots(pairs, rng, pool)) deck.push({ mascot }, { mascot });
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];

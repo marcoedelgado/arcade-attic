@@ -2,7 +2,7 @@
 // or timers. All rules live in engine.js.
 import { createGame, winnerOf } from './engine.js';
 import { mascotImg } from './sprites.js';
-import { MASCOTS } from './mascots.js';
+import { MASCOTS, FAMILIES } from './mascots.js';
 
 const MODES = {
   easy:   { pairs: 6,  cols: 4 },
@@ -11,6 +11,10 @@ const MODES = {
 };
 const MISMATCH_MS = 800;
 const NAMES = new Map(MASCOTS.map((m) => [m.id, m.name]));
+const FAMILY_IDS = new Map(
+  FAMILIES.map((f) => [f, MASCOTS.filter((m) => m.family === f).map((m) => m.id)]),
+);
+const FAM_KEY = 'pocket-pairs:families';
 
 const el = (id) => document.getElementById(id);
 const startScreen = el('start');
@@ -19,6 +23,9 @@ const boardEl = el('board');
 const hudEl = el('hud');
 const overlayEl = el('overlay');
 const resultEl = el('result');
+const catsEl = el('cats');
+const startBtn = el('start-btn');
+const startHint = el('start-hint');
 
 let game = null;
 let mode = null;      // { pairs, cols }
@@ -69,12 +76,98 @@ function mmss(total) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// --- mascot categories -------------------------------------------------------
+
+function readFamilies() {
+  try {
+    const raw = localStorage.getItem(FAM_KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      if (Array.isArray(v) && v.every((f) => FAMILIES.includes(f))) return new Set(v);
+    }
+  } catch { /* ignore */ }
+  return new Set(FAMILIES); // first visit / stored value missing or invalid → all on
+}
+
+function writeFamilies(set) {
+  try { localStorage.setItem(FAM_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+}
+
+// Build the four category toggles: a checkbox + family name + its four sprites.
+function buildCats() {
+  const enabled = readFamilies();
+  catsEl.textContent = '';
+  for (const fam of FAMILIES) {
+    const row = document.createElement('label');
+    row.className = 'pp-cat';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = enabled.has(fam);
+    cb.dataset.family = fam;
+    cb.addEventListener('change', onCatChange);
+
+    const name = document.createElement('span');
+    name.className = 'pp-cat-name';
+    name.textContent = fam;
+
+    const sprites = document.createElement('span');
+    sprites.className = 'pp-cat-sprites';
+    for (const id of FAMILY_IDS.get(fam)) {
+      sprites.appendChild(mascotImg(id, NAMES.get(id), 'pp-cat-sprite'));
+    }
+
+    row.append(cb, name, sprites);
+    row.classList.toggle('off', !cb.checked);
+    catsEl.appendChild(row);
+  }
+}
+
+function catBoxes() {
+  return [...catsEl.querySelectorAll('input[type="checkbox"]')];
+}
+
+function enabledMascots() {
+  const ids = [];
+  for (const cb of catBoxes()) {
+    if (cb.checked) ids.push(...FAMILY_IDS.get(cb.dataset.family));
+  }
+  return ids;
+}
+
+function onCatChange() {
+  for (const cb of catBoxes()) {
+    cb.closest('.pp-cat').classList.toggle('off', !cb.checked);
+  }
+  writeFamilies(new Set(catBoxes().filter((c) => c.checked).map((c) => c.dataset.family)));
+  syncStart();
+}
+
+// Enable Start only when the chosen board size can be filled from the selected
+// categories; otherwise show a hint saying how many more mascots are needed.
+function syncStart() {
+  const key = chosen('mode');
+  const pairs = MODES[key].pairs;
+  const n = enabledMascots().length;
+  if (n < pairs) {
+    startBtn.disabled = true;
+    startHint.textContent = `${key[0].toUpperCase()}${key.slice(1)} needs ${pairs} mascots — ${n} selected`;
+    startHint.hidden = false;
+  } else {
+    startBtn.disabled = false;
+    startHint.hidden = true;
+    startHint.textContent = '';
+  }
+}
+
 function startGame() {
   clearTimeout(pendingFlip);
   pendingFlip = 0;
   mode = MODES[chosen('mode')];
   players = Number(chosen('players'));
-  game = createGame({ pairs: mode.pairs, players });
+  const pool = enabledMascots();
+  if (pool.length < mode.pairs) return;   // Start is disabled in this state; belt-and-braces
+  game = createGame({ pairs: mode.pairs, players, pool });
   busy = false;
   onGameStart();          // reset the solo timer + best-score flag
 
@@ -252,7 +345,15 @@ function onGameEnd() {
 }
 
 // --- wiring ---
-el('start-btn').addEventListener('click', startGame);
+startBtn.addEventListener('click', startGame);
+el('select-all').addEventListener('click', () => {
+  for (const cb of catBoxes()) cb.checked = true;
+  onCatChange();
+});
+document.querySelectorAll('input[name="mode"]').forEach((r) =>
+  r.addEventListener('change', syncStart));
+buildCats();
+syncStart();
 el('new-game').addEventListener('click', () => {
   onGameEnd();               // stop the solo timer if the game was abandoned mid-play
   overlayEl.hidden = true;

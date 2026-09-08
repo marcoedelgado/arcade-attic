@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MASCOTS, pickMascots } from '../games/pocket-pairs/mascots.js';
+import { MASCOTS, FAMILIES, pickMascots } from '../games/pocket-pairs/mascots.js';
 
 // Deterministic RNG: cycles through a fixed list of fractions in [0,1).
 function seededRng(seed = 1) {
@@ -52,6 +52,25 @@ test('pickMascots: rejects out-of-range count', () => {
   assert.throws(() => pickMascots(6.5), /count/);
 });
 
+test('FAMILIES: the four family names, covering all 16 mascots', () => {
+  assert.equal(FAMILIES.length, 4);
+  assert.deepEqual(new Set(FAMILIES), new Set(MASCOTS.map((m) => m.family)));
+  const counts = {};
+  for (const m of MASCOTS) counts[m.family] = (counts[m.family] ?? 0) + 1;
+  for (const fam of FAMILIES) assert.equal(counts[fam], 4, `${fam} has ${counts[fam]}`);
+});
+
+test('pickMascots: restricted pool — picks only from the pool, guards its size', () => {
+  const pool = MASCOTS.filter((m) => m.family === FAMILIES[0] || m.family === FAMILIES[1]).map((m) => m.id);
+  assert.equal(pool.length, 8);
+  const picked = pickMascots(8, seededRng(1), pool);
+  assert.deepEqual([...picked].sort(), [...pool].sort(), 'all 8 of an 8-pool');
+  const six = pickMascots(6, seededRng(2), pool);
+  assert.equal(six.length, 6);
+  for (const id of six) assert.ok(pool.includes(id));
+  assert.throws(() => pickMascots(12, seededRng(3), pool), /count/, 'pool too small for 12');
+});
+
 import { createGame } from '../games/pocket-pairs/engine.js';
 
 test('deck: pairs*2 cards, every mascot appears exactly twice', () => {
@@ -94,6 +113,15 @@ test('createGame: rejects bad pairs / players', () => {
   assert.throws(() => createGame({ pairs: 5, players: 1 }), /pairs/);
   assert.throws(() => createGame({ pairs: 8, players: 3 }), /players/);
   assert.throws(() => createGame({ pairs: 20, players: 1 }), /pairs/);
+});
+
+test('createGame: restricted pool — board mascots all come from the pool', () => {
+  const pool = MASCOTS.filter((m) => m.family === FAMILIES[2] || m.family === FAMILIES[3]).map((m) => m.id);
+  const g = createGame({ pairs: 8, players: 1, rng: seededRng(9), pool });
+  const onBoard = new Set(g.cards.map((c) => c.mascot));
+  assert.equal(onBoard.size, 8);
+  for (const id of onBoard) assert.ok(pool.includes(id), `${id} not in the restricted pool`);
+  assert.throws(() => createGame({ pairs: 12, players: 1, pool }), /count/, 'pool of 8 cannot fill 12 pairs');
 });
 
 test('flip: reveals a card; second distinct flip locks the board', () => {

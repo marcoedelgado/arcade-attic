@@ -20,10 +20,14 @@ export const MASCOTS = [
   { id: 'rocket',    name: 'Rocket Rig',   family: 'Turbo Wheels' },
 ];
 
-// Pick `count` distinct mascot ids at random from the full roster.
-// Fisher–Yates on a copy, then the first `count`. `rng` is injectable for tests.
-export function pickMascots(count, rng = Math.random) {
-  const ids = MASCOTS.map((m) => m.id);
+// The four families, in roster order — the toggleable categories on the menu.
+export const FAMILIES = ['Elemental Pals', 'Toy-Line Heroes', 'Tiny Helpers', 'Turbo Wheels'];
+
+// Pick `count` distinct mascot ids at random from `pool` (defaults to the full
+// roster). Fisher–Yates on a copy, then the first `count`. `rng` is injectable
+// for tests.
+export function pickMascots(count, rng = Math.random, pool = MASCOTS.map((m) => m.id)) {
+  const ids = [...pool];
   if (!Number.isInteger(count)) {
     throw new Error(`pickMascots: count must be an integer, got ${count}`);
   }

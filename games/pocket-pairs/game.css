@@ -35,6 +35,60 @@ body { overscroll-behavior-x: contain; }
   cursor: pointer;
 }
 .pp-start .aa-btn { align-self: center; }
+.pp-start .aa-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow);
+}
+
+/* Mascot categories */
+.pp-mascots { position: relative; }
+.pp-selectall {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--neon-blue);
+  background: var(--panel);
+  border: 0;
+  padding: 0 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.pp-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.pp-cats .pp-cat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.pp-cat input { flex: none; }
+.pp-cat-name { font-size: 13px; }
+.pp-cat-sprites {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+.pp-cat-sprite {
+  width: 30px;
+  height: 30px;
+  image-rendering: pixelated;
+}
+.pp-cat.off { opacity: 0.4; }
+.pp-hint {
+  text-align: center;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--neon-pink);
+}
 
 /* HUD */
 .pp-hud {
@@ -195,4 +249,6 @@ body { overscroll-behavior-x: contain; }
 @media (max-width: 420px) {
   .pp-board { gap: 7px; }
   .pp-cover { font-size: 14px; }
+  .pp-cat-sprite { width: 26px; height: 26px; }
+  .pp-cat-name { font-size: 12px; }
 }
