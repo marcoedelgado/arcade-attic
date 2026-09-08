@@ -76,13 +76,19 @@ function startGame() {
   players = Number(chosen('players'));
   game = createGame({ pairs: mode.pairs, players });
   busy = false;
-  boardEl.style.setProperty('--cols', mode.cols);
-  overlayEl.hidden = true;
-  startScreen.hidden = true;
-  playScreen.hidden = false;
   onGameStart();          // reset the solo timer + best-score flag
-  buildBoard();
-  render();
+
+  // Defer the view swap + board build out of the tap's own event handler. A big
+  // synchronous DOM change inside a touch handler is intermittently misread by
+  // iOS as a swipe-back gesture (the board would flash, then navigate home).
+  requestAnimationFrame(() => {
+    boardEl.style.setProperty('--cols', mode.cols);
+    overlayEl.hidden = true;
+    startScreen.hidden = true;
+    playScreen.hidden = false;
+    buildBoard();
+    render();
+  });
 }
 
 function render() {
