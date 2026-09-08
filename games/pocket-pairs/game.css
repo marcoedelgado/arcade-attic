@@ -1,11 +1,12 @@
 /* Pocket Pairs — board, card flip, start screen, HUD, overlay.
    Uses the shared tokens from assets/styles.css. */
 
-/* iOS guard: a tap on Start swaps the whole view + builds the board. Without
-   this, iOS intermittently reads that touch as an edge swipe-back and navigates
-   away to the home page. Matches the touch guards the other games already use. */
-body { overscroll-behavior-x: contain; }
-.pp-card,
+/* Touch guards (match the other games). A tap or slight finger drag on the
+   board must never pan, bounce or navigate the page — and a big DOM swap inside
+   a tap handler must not be read by iOS as a swipe-back. */
+body { overscroll-behavior: contain; }
+.pp-board,
+.pp-card { touch-action: none; }
 .aa-btn { touch-action: manipulation; }
 
 .pp-start {
