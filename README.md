@@ -107,6 +107,28 @@ node --test
 
 That's it. No config, no registration, no rebuild.
 
+### Touch guards (any game played by tapping or dragging)
+
+Most of these games are played on a phone. Without the guards below, a tap that
+misses slightly pans the whole page, pull-to-refresh fires mid-game, and iOS can
+read a tap that swaps the screen as a swipe-back (you get bounced to the home
+page). Add to your `game.css`:
+
+```css
+body { overscroll-behavior: contain; }   /* no rubber-band / pull-to-refresh / swipe-back */
+.your-play-area { touch-action: none; }   /* a tap or drag here never scrolls the page */
+.aa-btn { touch-action: manipulation; }   /* taps fire instantly, no double-tap-zoom delay */
+```
+
+Use `touch-action: none` on the actual play surface (board, canvas, drag area);
+keep the space around it scrollable so a tall layout still fits a small screen.
+Every game except the first (`tic-tac-toe`) carries a version of this — copy from
+`asteroid-run`, `bins-on-the-moon`, `waffle-wednesday`, or `pocket-pairs`.
+
+If a tap handler does a big synchronous DOM change (swapping a menu for a board,
+building a grid of cards), defer it one frame with `requestAnimationFrame` so iOS
+doesn't mistake the tap for a swipe-back — see `games/pocket-pairs/game.js`.
+
 ## Design vocabulary (optional, for consistency)
 
 `assets/styles.css` defines CSS custom properties you can reuse so every game
