@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt } from '../games/deep-glow/depth.js';
+import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../games/deep-glow/depth.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -43,5 +43,64 @@ test('depth: escalation is monotonic, starts at 1, and is capped', () => {
     assert.ok(e >= prev, `escalation fell at ${m}m`);
     assert.ok(e <= 2.5, `escalation ${e} exceeded the cap at ${m}m`);
     prev = e;
+  }
+});
+
+test('depth: palette is continuous at all boundaries including loop seams', () => {
+  const boundaries = [200, 400, 600, 800, 1000, 1200, 1600, 2200];
+  const mixed = (p) => p.a.map((c, i) => c + (p.b[i] - c) * p.mix);
+
+  for (const B of boundaries) {
+    const before = paletteAt(B - 0.01);
+    const after = paletteAt(B + 0.01);
+    const x = mixed(before);
+    const y = mixed(after);
+    for (let i = 0; i < 3; i++) {
+      assert.ok(Math.abs(x[i] - y[i]) < 0.02,
+        `at ${B}m channel ${i} jumped ${x[i].toFixed(4)} -> ${y[i].toFixed(4)}`);
+    }
+  }
+});
+
+test('depth: cast invariants — unique ids, one rare per zone, valid kinds', () => {
+  const allIds = new Set();
+  const rarePerZone = new Map();
+
+  for (let z = 0; z < ZONES.length; z++) {
+    const zone = ZONES[z];
+    let rareCount = 0;
+
+    for (const creature of zone.cast) {
+      // Unique ids across all zones
+      assert.ok(!allIds.has(creature.id), `duplicate creature id: ${creature.id}`);
+      allIds.add(creature.id);
+
+      // Valid kind
+      assert.ok(['drifter', 'shy', 'bumper'].includes(creature.kind),
+        `invalid kind "${creature.kind}" in ${zone.name}`);
+
+      // Track rare count
+      if (creature.rare) {
+        rareCount++;
+      }
+    }
+
+    // Exactly one rare per zone
+    assert.equal(rareCount, 1,
+      `zone ${z} (${zone.name}) has ${rareCount} rare creatures, expected 1`);
+
+    // Rare creatures must be drifters (reward, not penalty)
+    const rare = zone.cast.find(c => c.rare);
+    assert.equal(rare.kind, 'drifter',
+      `rare creature "${rare.id}" in ${zone.name} is "${rare.kind}", expected "drifter"`);
+  }
+});
+
+test('depth: castAt returns the roster for the zone', () => {
+  for (let m = 0; m < 3000; m += 100) {
+    const { index } = zoneAt(m);
+    const cast = castAt(m);
+    assert.deepEqual(cast, ZONES[index].cast,
+      `castAt(${m}m) does not match zoneAt(${m}m).index`);
   }
 });
