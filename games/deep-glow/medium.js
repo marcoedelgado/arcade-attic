@@ -23,10 +23,23 @@ in vec2 vUv;
 uniform vec3 uZoneA;
 uniform vec3 uZoneB;
 uniform float uZoneMix;
+uniform vec3 uLamp;        // x, y (device px, top-left origin), radius (device px)
+uniform vec2 uResolution;  // drawing-buffer size in device px
 out vec4 outColor;
 void main() {
   vec3 top = mix(uZoneA, uZoneB, uZoneMix);
   vec3 col = mix(top, top * 0.25, vUv.y);
+
+  // The lamp lifts the water it sits in rather than being painted on top: brighten
+  // the medium inside uLamp.z with a soft edge, so the light reads as being IN the
+  // water. gl_FragCoord is bottom-left origin; uLamp is top-left, hence the flip.
+  if (uLamp.z > 0.0) {
+    vec2 frag = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
+    float d = distance(frag, uLamp.xy);
+    float glow = 1.0 - smoothstep(uLamp.z * 0.15, uLamp.z, d);
+    col += top * glow * 0.9 + vec3(0.03, 0.035, 0.045) * glow;
+  }
+
   outColor = vec4(col, 1.0);
 }
 `;
@@ -48,6 +61,7 @@ export function makeMedium(glx) {
     zoneB: gl.getUniformLocation(prog, 'uZoneB'),
     zoneMix: gl.getUniformLocation(prog, 'uZoneMix'),
     lamp: gl.getUniformLocation(prog, 'uLamp'),
+    resolution: gl.getUniformLocation(prog, 'uResolution'),
     calm: gl.getUniformLocation(prog, 'uCalm'),
   };
 
@@ -58,6 +72,7 @@ export function makeMedium(glx) {
     zoneB,
     zoneMix = 0,
     lamp = null,
+    resolution = null,
     calm = 0,
   } = {}) {
     gl.useProgram(prog);
@@ -69,6 +84,7 @@ export function makeMedium(glx) {
     if (zoneB) gl.uniform3fv(u.zoneB, zoneB);
     gl.uniform1f(u.zoneMix, zoneMix);
     if (lamp) gl.uniform3f(u.lamp, lamp.x, lamp.y, lamp.radius);
+    if (resolution) gl.uniform2f(u.resolution, resolution[0], resolution[1]);
     gl.uniform1f(u.calm, calm);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);

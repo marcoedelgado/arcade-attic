@@ -4,6 +4,7 @@ import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../
 import { makeDiver } from '../games/deep-glow/diver.js';
 import { makeField } from '../games/deep-glow/field.js';
 import { makeLamp } from '../games/deep-glow/lamp.js';
+import { takePlankton, bumped, sighted } from '../games/deep-glow/collect.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -255,4 +256,29 @@ test('lamp: fuel exhausted by bumps still browns out', () => {
   assert.equal(s.brownout, true, 'brownout did not fire on update after fuel was zeroed by bumps');
   l.relight();
   assert.ok(Math.abs(l.fuel - 0.5) < 1e-9, `relit at ${l.fuel}, wanted 0.5`);
+});
+
+test('collect: takes only plankton inside the radius', () => {
+  const p = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 3, y: 4 }];
+  const hit = takePlankton({ x: 0, y: 0 }, p, 10);
+  assert.deepEqual([...hit].sort((a, b) => a - b), [0, 2]);
+});
+
+test('collect: indices come back descending so splicing stays safe', () => {
+  const p = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }];
+  const hit = takePlankton({ x: 0, y: 0 }, p, 50);
+  assert.deepEqual(hit, [2, 1, 0]);
+  for (const i of hit) p.splice(i, 1);       // must not throw or skip
+  assert.equal(p.length, 0);
+});
+
+test('collect: a rare creature counts as seen only within lamp radius', () => {
+  const creatures = [{ id: 'lantern-jelly', rare: true, x: 0, y: 90 }];
+  assert.deepEqual(sighted({ x: 0, y: 0 }, creatures, 50), []);
+  assert.deepEqual(sighted({ x: 0, y: 0 }, creatures, 120), ['lantern-jelly']);
+});
+
+test('collect: non-rare creatures are never reported as sightings', () => {
+  const creatures = [{ id: 'drifter', rare: false, x: 0, y: 0 }];
+  assert.deepEqual(sighted({ x: 0, y: 0 }, creatures, 500), []);
 });

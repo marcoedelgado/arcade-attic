@@ -26,7 +26,12 @@ const SINK_DOWN_MAX = 1.7;   // fully "down": descent boosted to this multiple o
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export function makeDiver({ viewport }) {
+// restFraction — the screen fraction the diver actually renders at (game.js's
+// DIVER_SCREEN_Y). It is the NEUTRAL vertical-aim point: a finger sitting where
+// it naturally rests, holding the fish steady, must read as "sink normally", not
+// "steer up". Defaulted here so diver.js stays pure — game.js passes its own
+// constant in, it is never imported.
+export function makeDiver({ viewport, restFraction = 0.42 }) {
   let vp = viewport;
 
   // Horizontal: screen-centre-relative pixels. steerX is what pos()/render read;
@@ -43,7 +48,10 @@ export function makeDiver({ viewport }) {
   let y = 0;                     // depth, metres — the score
   let thrust = { x: 0, y: 0 };
 
-  function midBand() { return vp.height * (BOX_TOP + BOX_BOTTOM) / 2; }
+  // Neutral vertical line: where the diver renders, not the geometric middle of
+  // the steering box. Used both to seed steerY/targetY and as the zero point of
+  // the sink-rate band below.
+  function midBand() { return vp.height * restFraction; }
 
   function box() {
     const half = vp.width / 2;
@@ -99,9 +107,15 @@ export function makeDiver({ viewport }) {
         steerX = nextX;
 
         // Vertical steer -> descent multiplier. band is -1 at the top of the
-        // band, 0 in the middle, +1 at the bottom. The sink is only throttled or
+        // box, 0 at the diver's REST LINE (midBand, == render position), +1 at
+        // the bottom. The zero point is the rest line, not the geometric middle
+        // of the box, so "hold still" means "sink normally". The two sides are
+        // scaled independently so both extremes still reach exactly ±1 even
+        // though the rest line sits above centre. The sink is only throttled or
         // boosted, never reversed: the multiplier stays strictly positive.
-        const band = clamp((steerY - (b.y0 + b.y1) / 2) / ((b.y1 - b.y0) / 2), -1, 1);
+        const mid = midBand();
+        const span = steerY < mid ? (mid - b.y0) : (b.y1 - mid);
+        const band = clamp(span > 0 ? (steerY - mid) / span : 0, -1, 1);
         const mult = 1 + band * (band < 0 ? (1 - SINK_UP_MIN) : (SINK_DOWN_MAX - 1));
         y += SINK_RATE * sinkScale * mult * dt;
       }
@@ -110,6 +124,16 @@ export function makeDiver({ viewport }) {
 
     box,
     pos() { return { x: steerX, y }; },
+
+    // Move the diver's depth directly, outside the normal sink integration, and
+    // return the new snapshot. game.js uses this for the brownout rescue: a
+    // negative dm drifts the diver back up toward the surface while input is
+    // ignored. Depth is the score, so it is floored at 0 — the rescue can lift
+    // you toward the light but never above it.
+    nudge(dm) {
+      y = Math.max(0, y + dm);
+      return { x: steerX, y, vx: lastVx };
+    },
 
     setViewport(next) {
       vp = next;
