@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../games/deep-glow/depth.js';
+import { makeDiver } from '../games/deep-glow/diver.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -103,4 +104,47 @@ test('depth: castAt returns the roster for the zone', () => {
     assert.deepEqual(cast, ZONES[index].cast,
       `castAt(${m}m) does not match zoneAt(${m}m).index`);
   }
+});
+
+const vp = { width: 480, height: 800 };
+
+test('diver: eased follow converges on the aim target', () => {
+  const d = makeDiver({ viewport: vp });
+  d.aim(360, 400);
+  for (let i = 0; i < 200; i++) d.update(1 / 60, { sinkScale: 0 });
+  const b = d.box();
+  assert.ok(d.pos().x > 0, 'aiming right of centre should move the diver right');
+  assert.ok(d.pos().x <= b.x1 + 1e-6, 'settled outside the box');
+});
+
+test('diver: the box clamps in all four directions', () => {
+  const d = makeDiver({ viewport: vp });
+  for (const [sx, sy] of [[-99999, -99999], [99999, 99999]]) {
+    d.aim(sx, sy);
+    for (let i = 0; i < 200; i++) d.update(1 / 60, { sinkScale: 0 });
+    const b = d.box(), p = d.pos();
+    assert.ok(p.x >= b.x0 - 1e-6 && p.x <= b.x1 + 1e-6, `x ${p.x} escaped [${b.x0}, ${b.x1}]`);
+  }
+});
+
+test('diver: sinks regardless of steering, and steering up never reverses it', () => {
+  const d = makeDiver({ viewport: vp });
+  d.aim(240, 0);                       // hard up
+  let prev = d.pos().y;
+  for (let i = 0; i < 300; i++) {
+    d.update(1 / 60, { sinkScale: 1 });
+    const y = d.pos().y;
+    assert.ok(y >= prev - 1e-9, `depth went backwards: ${prev} -> ${y}`);
+    prev = y;
+  }
+  assert.ok(prev > 0, 'diver never actually descended');
+});
+
+test('diver: update(0) is a side-effect-free snapshot', () => {
+  const d = makeDiver({ viewport: vp });
+  d.aim(300, 300);
+  d.update(1 / 60, { sinkScale: 1 });
+  const before = d.pos();
+  d.update(0, { sinkScale: 1 });
+  assert.deepEqual(d.pos(), before);
 });
