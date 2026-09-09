@@ -12,7 +12,7 @@ import { paletteAt, castAt, escalationAt } from './depth.js';
 import { makeLoop } from './loop.js';
 import { makeDiver } from './diver.js';
 import { makeField } from './field.js';
-import { makeLamp } from './lamp.js';
+import { makeLamp, REFUEL } from './lamp.js';
 import { takePlankton } from './collect.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
@@ -22,7 +22,6 @@ const PLANKTON_SIZE = 22;      // mote sprite edge in CSS px
 const PLANKTON_DRIFT = 6;      // CSS px of lazy horizontal sway, keyed off each mote's phase
 
 const PICKUP_RADIUS_M = 3.4;   // metres — the diver's catch reach for plankton
-const REFUEL = 0.14;           // fuel restored per mote collected (mirrors lamp.js)
 const GLOW_SCALE = 2.4;        // lamp sprite edge as a multiple of the lamp's pixel radius
 const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
@@ -220,6 +219,9 @@ if (!glx) {
           lampSnap.radius = lamp.radius;
           lampSnap.brownout = false;
           state = STATE.DIVING;                  // play resumes — no game-over
+          applyKeys();                           // a key still physically held
+                                                 // must take effect now, not on
+                                                 // the next press
         }
       }
 

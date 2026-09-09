@@ -5,7 +5,12 @@
 // tests/deep-glow.test.mjs.
 
 const DRAIN_PER_SEC = 0.055;     // fuel/s, scaled by escalation
-const REFUEL = 0.14;              // fuel gained per pickup
+
+// Fuel gained per plankton pickup. Exported because game.js is the only caller of
+// refuel() and needs the amount at the call site — this is its single home. The
+// verbatim suite pins refuel(n) as parameterised (`l.refuel(0.5)`), so refuel()
+// keeps taking its argument; this constant is just what game.js passes in.
+export const REFUEL = 0.14;
 const BUMP_COST = 0.22;           // fuel lost per creature bump
 const RADIUS_MIN = 60;            // pixels: minimum light radius (never fully dark)
 const RADIUS_MAX = 300;           // pixels: maximum light radius at full fuel
