@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../games/deep-glow/depth.js';
 import { makeDiver } from '../games/deep-glow/diver.js';
 import { makeField } from '../games/deep-glow/field.js';
+import { makeLamp } from '../games/deep-glow/lamp.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -199,4 +200,49 @@ test('field: reset empties everything', () => {
   f.reset();
   assert.equal(f.plankton.length, 0);
   assert.equal(f.creatures.length, 0);
+});
+
+test('lamp: drains monotonically without pickups', () => {
+  const l = makeLamp();
+  let prev = Infinity;
+  for (let i = 0; i < 100; i++) {
+    const s = l.update(0.1, { escalation: 1 });
+    assert.ok(s.fuel <= prev + 1e-9, 'fuel went up without a pickup');
+    prev = s.fuel;
+  }
+});
+
+test('lamp: refuel caps at full', () => {
+  const l = makeLamp();
+  for (let i = 0; i < 50; i++) l.refuel(0.5);
+  assert.ok(l.fuel <= 1 + 1e-9, `fuel overflowed to ${l.fuel}`);
+});
+
+test('lamp: a bump cannot take fuel below zero', () => {
+  const l = makeLamp();
+  for (let i = 0; i < 20; i++) l.bump();
+  assert.ok(l.fuel >= 0, `fuel went negative: ${l.fuel}`);
+});
+
+test('lamp: brownout fires exactly once, and relight restores half', () => {
+  const l = makeLamp();
+  let fired = 0;
+  for (let i = 0; i < 600; i++) if (l.update(0.1, { escalation: 1 }).brownout) fired++;
+  assert.equal(fired, 1, `brownout fired ${fired} times`);
+  l.relight();
+  assert.ok(Math.abs(l.fuel - 0.5) < 1e-9, `relit at ${l.fuel}, wanted 0.5`);
+});
+
+test('lamp: radius never drops below the floor while lit', () => {
+  const l = makeLamp();
+  for (let i = 0; i < 200; i++) {
+    const s = l.update(0.05, { escalation: 1 });
+    if (s.fuel > 0) assert.ok(s.radius >= 60, `radius ${s.radius} fell below the floor`);
+  }
+});
+
+test('lamp: escalation drains faster', () => {
+  const slow = makeLamp(), fast = makeLamp();
+  for (let i = 0; i < 20; i++) { slow.update(0.1, { escalation: 1 }); fast.update(0.1, { escalation: 2 }); }
+  assert.ok(fast.fuel < slow.fuel, 'escalation did not increase the drain');
 });
