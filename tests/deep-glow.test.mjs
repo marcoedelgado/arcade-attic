@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../games/deep-glow/depth.js';
 import { makeDiver } from '../games/deep-glow/diver.js';
+import { makeField } from '../games/deep-glow/field.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -147,4 +148,55 @@ test('diver: update(0) is a side-effect-free snapshot', () => {
   const before = d.pos();
   d.update(0, { sinkScale: 1 });
   assert.deepEqual(d.pos(), before);
+});
+
+function seeded(seed) {                       // deterministic LCG for tests
+  let s = seed >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+const ctx = (box) => ({ box, viewMetres: 60, cast: [], escalation: 1 });
+const BOX = { x0: -200, x1: 200 };
+
+test('field: deterministic under an injected rng', () => {
+  const a = makeField({ rng: seeded(7) }), b = makeField({ rng: seeded(7) });
+  for (let i = 0; i < 100; i++) { a.step(2, ctx(BOX)); b.step(2, ctx(BOX)); }
+  assert.deepEqual(a.plankton, b.plankton);
+});
+
+test('field: density is per-metre, not per-step', () => {
+  const coarse = makeField({ rng: seeded(3) });
+  const fine = makeField({ rng: seeded(3) });
+  for (let i = 0; i < 10; i++) coarse.step(20, ctx(BOX));    // 200 m in 10 steps
+  for (let i = 0; i < 200; i++) fine.step(1, ctx(BOX));      // 200 m in 200 steps
+  const ratio = fine.plankton.length / Math.max(1, coarse.plankton.length);
+  assert.ok(ratio > 0.75 && ratio < 1.33,
+    `same 200 m gave ${coarse.plankton.length} vs ${fine.plankton.length}`);
+});
+
+test('field: spawns are box-relative, so a narrow phone is not a harder game', () => {
+  const wide = makeField({ rng: seeded(11) });
+  const narrow = makeField({ rng: seeded(11) });
+  const NARROW = { x0: -100, x1: 100 };
+  for (let i = 0; i < 60; i++) { wide.step(3, ctx(BOX)); narrow.step(3, ctx(NARROW)); }
+  assert.equal(wide.plankton.length, narrow.plankton.length,
+    'the same descent must offer the same number of pickups at any width');
+  for (let i = 0; i < narrow.plankton.length; i++) {
+    const fw = (wide.plankton[i].x - BOX.x0) / (BOX.x1 - BOX.x0);
+    const fn = (narrow.plankton[i].x - NARROW.x0) / (NARROW.x1 - NARROW.x0);
+    assert.ok(Math.abs(fw - fn) < 1e-9, `relative spawn position differed at index ${i}`);
+  }
+});
+
+test('field: culls what has gone past, so the arrays stay bounded', () => {
+  const f = makeField({ rng: seeded(5) });
+  for (let i = 0; i < 2000; i++) f.step(3, ctx(BOX));
+  assert.ok(f.plankton.length < 200, `leaked ${f.plankton.length} plankton`);
+});
+
+test('field: reset empties everything', () => {
+  const f = makeField({ rng: seeded(9) });
+  for (let i = 0; i < 50; i++) f.step(3, ctx(BOX));
+  f.reset();
+  assert.equal(f.plankton.length, 0);
+  assert.equal(f.creatures.length, 0);
 });
