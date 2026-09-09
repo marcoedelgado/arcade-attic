@@ -183,11 +183,14 @@ function pointerPos(e) {
 canvas.addEventListener('pointerdown', (e) => {
   launchOrRestart();
   if (state !== 'playing') return;
+  // Keep receiving moves even if the finger slides past the canvas edge.
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* not all engines */ }
   const p = pointerPos(e);
   ship.aim(p.x, p.y, p.touch ? 'touch' : 'mouse');
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (e.pressure === 0 && e.pointerType === 'touch') return;
+  // No pressure/button gate: a touch pointermove only fires while the finger is
+  // down, and phones without Force Touch report e.pressure === 0 the whole drag.
   const p = pointerPos(e);
   if (state === 'playing') ship.aim(p.x, p.y, p.touch ? 'touch' : 'mouse');
 });
