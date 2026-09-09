@@ -16,16 +16,16 @@ export function makeLamp() {
 
   return {
     update(dt, { escalation = 1 } = {}) {
-      const prevFuel = fuel;
-
       if (dt > 0) {
         fuel -= DRAIN_PER_SEC * escalation * dt;
         if (fuel < 0) fuel = 0;
       }
 
-      // Brownout latch: fire only on the transition to zero (from > 0 to <= 0)
+      // Brownout latch: fire when fuel is depleted, regardless of what caused it
+      // (drain or bump). State-based check ensures next update() picks up fuel
+      // zeroed by bump() without requiring a transition.
       let brownout = false;
-      if (prevFuel > 0 && fuel <= 0 && !hasBrownedOut) {
+      if (fuel <= 0 && !hasBrownedOut) {
         brownout = true;
         hasBrownedOut = true;
       }

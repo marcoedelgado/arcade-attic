@@ -246,3 +246,13 @@ test('lamp: escalation drains faster', () => {
   for (let i = 0; i < 20; i++) { slow.update(0.1, { escalation: 1 }); fast.update(0.1, { escalation: 2 }); }
   assert.ok(fast.fuel < slow.fuel, 'escalation did not increase the drain');
 });
+
+test('lamp: fuel exhausted by bumps still browns out', () => {
+  const l = makeLamp();
+  for (let i = 0; i < 5; i++) l.bump();
+  assert.equal(l.fuel, 0, 'bumps did not exhaust fuel to zero');
+  const s = l.update(0.01, { escalation: 1 });
+  assert.equal(s.brownout, true, 'brownout did not fire on update after fuel was zeroed by bumps');
+  l.relight();
+  assert.ok(Math.abs(l.fuel - 0.5) < 1e-9, `relit at ${l.fuel}, wanted 0.5`);
+});
