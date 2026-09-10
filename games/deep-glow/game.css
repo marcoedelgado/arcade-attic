@@ -206,6 +206,17 @@ body { overscroll-behavior: contain; }
   border-radius: var(--radius);
   color: var(--ink);
 }
+/* Without this the game is blank in EVERY browser. An author `display` beats the
+   UA stylesheet's `[hidden] { display: none }`, so `display: grid` above leaves
+   this opaque, inset:0 panel painted over the whole canvas forever — the HUD
+   still updates on top of it, which makes it look like a render bug rather than
+   a stacking one. .dg-menu and .dg-hud carry the same guard; caption and
+   tilt-msg set no display of their own, but are guarded here too so that
+   adding one later can't silently resurrect this.
+   pocket-pairs hit exactly this in 4771ff2. */
+.dg-fallback[hidden],
+.dg-caption[hidden],
+.dg-tilt-msg[hidden] { display: none; }
 
 /* A short caption naming a rare creature just sighted — a small pill anchored
    to the bottom of the stage, never blocking the drag/tap that steers it. */

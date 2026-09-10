@@ -129,6 +129,23 @@ If a tap handler does a big synchronous DOM change (swapping a menu for a board,
 building a grid of cards), defer it one frame with `requestAnimationFrame` so iOS
 doesn't mistake the tap for a swipe-back — see `games/pocket-pairs/game.js`.
 
+### The `[hidden]` trap (any element you show/hide from JS)
+
+If you give an element a `display` in your CSS **and** hide it with the `hidden`
+attribute, it will not hide. An author `display` out-ranks the UA stylesheet's
+`[hidden] { display: none }`, so the element stays on screen forever. Guard every
+such element:
+
+```css
+.your-panel[hidden] { display: none; }
+```
+
+This has bitten twice now — `pocket-pairs` (`4771ff2`) and `deep-glow`, where an
+`inset: 0` fallback panel sat opaque over the canvas and made a perfectly working
+game look like a dead renderer. It is invisible to unit tests and easy to miss in
+review, because the markup says `hidden` and reads as correct. Grep your
+`game.css` for `display:` and check each one that JS ever toggles.
+
 ## Design vocabulary (optional, for consistency)
 
 `assets/styles.css` defines CSS custom properties you can reuse so every game
