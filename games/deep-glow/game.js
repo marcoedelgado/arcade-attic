@@ -655,6 +655,21 @@ if (!glx) {
       dprQuery.addEventListener('change', onDprChange, { once: true });
     }
 
+    // A THIRD case a resize/scroll/DPR listener alone misses: the webfont
+    // (assets/styles.css: Press Start 2P, `display=swap`) swapping in after
+    // first paint. `.aa-game-top` sits in normal flow directly above
+    // `.dg-stage-wrap`, so the metrics change reflows the canvas down — and
+    // no 'resize' or 'scroll' event fires for a font swap. Left unhandled,
+    // canvasRect goes stale for exactly the window (~1-2s after first paint)
+    // a player is most likely to tap Start, so every drag/aim computes
+    // against the pre-swap canvas position: steering reads as subtly,
+    // silently wrong until something else happens to trigger a re-measure.
+    // Guarded because document.fonts is missing on some engines — on those,
+    // the resize/scroll/DPR triggers above still cover the normal cases.
+    try {
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    } catch { /* no Font Loading API — the resize/scroll refreshes still cover us */ }
+
     // Persist the best depth when the page goes away mid-dive — a brownout is the
     // normal checkpoint, but a kid closing the tab shouldn't lose their record.
     window.addEventListener('pagehide', () => writeBest(best));
