@@ -15,6 +15,7 @@ import { makeField } from './field.js';
 import { makeLamp, REFUEL } from './lamp.js';
 import { takePlankton, bumped, sighted } from './collect.js';
 import { makeSightings } from './sightings.js';
+import { makeAudio } from './audio.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 64;         // sprite edge in CSS px (scaled by DPR at draw time)
@@ -93,6 +94,30 @@ if (!glx) {
     // real-world default handed in at this call site, same pattern as readBest/writeBest.
     const sightings = makeSightings({ storage: localStorage });
     const captionEl = document.getElementById('dg-caption');
+    const audio = makeAudio();
+    const muteBtn = document.getElementById('dg-mute');
+
+    function syncMuteBtn() {
+      if (!muteBtn) return;
+      if (!audio.supported) {
+        muteBtn.disabled = true;
+        muteBtn.textContent = '🔇';
+        muteBtn.setAttribute('aria-pressed', 'true');
+        muteBtn.setAttribute('aria-label', 'Sound unavailable in this browser');
+        return;
+      }
+      muteBtn.setAttribute('aria-pressed', String(audio.muted));
+      muteBtn.setAttribute('aria-label', audio.muted ? 'Unmute sound' : 'Mute sound');
+      muteBtn.textContent = audio.muted ? '🔇' : '🔊';
+    }
+    syncMuteBtn();
+    if (muteBtn && audio.supported) {
+      muteBtn.addEventListener('click', () => {
+        audio.unlock();          // the tap itself is the user gesture that may build the context
+        audio.setMuted(!audio.muted);
+        syncMuteBtn();
+      });
+    }
 
     let depthM = 0;
     let state = STATE.DIVING;   // Task 13: start at STATE.MENU instead
@@ -133,6 +158,7 @@ if (!glx) {
       for (const i of hits) {        // descending, so the splice is safe
         list.splice(i, 1);
         lamp.refuel(REFUEL);
+        audio.ping();               // steps the pentatonic scale — a run of pickups is a melody
       }
     }
 
@@ -191,6 +217,7 @@ if (!glx) {
         bumperScratch.length = n;
         if (bumped(diverMetres, bumperScratch, BUMP_RADIUS_M).length > 0) {
           lamp.bump();
+          audio.thud();
           wobbleT = WOBBLE_SECONDS;
           bumpCooldownT = BUMP_COOLDOWN_SECONDS;
         }
@@ -336,6 +363,7 @@ if (!glx) {
 
       if (state === STATE.DIVING) {
         depthM = diver.update(dt, { sinkScale: 1 }).y;
+        audio.setDepth(depthM);   // drone's cutoff falls, gain rises, as depth increases
 
         // Lamp fuel drains with depth; a depleted lamp latches `brownout` for a
         // single frame, which is our one-way ticket into the rescue state.
@@ -352,6 +380,7 @@ if (!glx) {
         if (s.brownout) {
           state = STATE.BROWNOUT;
           brownoutT = 0;
+          audio.brownout();                      // dip-and-recover in one scheduled call
           writeBest(best);                       // checkpoint the run
         }
       } else if (state === STATE.BROWNOUT) {
@@ -395,6 +424,7 @@ if (!glx) {
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
     canvas.addEventListener('pointerdown', (e) => {
+      audio.unlock();   // any gesture may need to pull a Safari-suspended context back to 'running'
       if (inputLocked()) return;
       try { canvas.setPointerCapture(e.pointerId); } catch { /* not all engines */ }
       const p = pointerPos(e);
@@ -416,6 +446,7 @@ if (!glx) {
       diver.setThrust(Math.sign(x), Math.sign(y));
     }
     window.addEventListener('keydown', (e) => {
+      audio.unlock();   // any gesture may need to pull a Safari-suspended context back to 'running'
       if (e.key === 'Tab' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key in keys) { keys[e.key] = 1; applyKeys(); e.preventDefault(); }
     });
