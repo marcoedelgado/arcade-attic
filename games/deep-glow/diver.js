@@ -14,7 +14,12 @@
 // frame-rate-independent eased follow toward the aim target, clamped to a
 // movement box: the same shape as games/asteroid-run/ship.js.
 
-const SINK_RATE = 34;        // m/s — base descent at neutral vertical steering
+// 22, not 34: at 34 a zone went past every ~6s, too fast to register now that
+// each zone actually holds its own colour. NOTE the coupling — lamp drain is
+// per SECOND but plankton supply is per METRE, so slowing the descent starves
+// the lamp unless field.js's PLANKTON_EVERY_METRES drops by the same factor.
+// It does (14 -> 9); change one and you must change the other.
+const SINK_RATE = 22;        // m/s — base descent at neutral vertical steering
 const FOLLOW = 10;           // eased-follow rate; applied as 1 - exp(-FOLLOW * dt)
 const TOUCH_OFFSET = 90;     // px the aim point rides below the finger, so a thumb never covers the diver
 const BOX_TOP = 0.20;        // movement / steering band, as fractions of viewport height

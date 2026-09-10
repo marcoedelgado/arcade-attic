@@ -20,7 +20,9 @@ import { makeTilt, tiltPreferred } from './tilt.js';
 import { makeHud } from './hud.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
-const DIVER_SIZE = 64;         // sprite edge in CSS px (scaled by DPR at draw time)
+const DIVER_SIZE = 84;         // sprite edge in CSS px (scaled by DPR at draw time).
+                               // 84, not 64: at 64 the fish was a smudge lost
+                               // inside its own lamp glow.
 const PX_PER_METRE = 9;        // CSS px of vertical scroll per metre of depth
 const PLANKTON_SIZE = 22;      // mote sprite edge in CSS px
 const PLANKTON_DRIFT = 6;      // CSS px of lazy horizontal sway, keyed off each mote's phase
@@ -41,7 +43,10 @@ const TILT_MSG_SECONDS = 3;    // how long the "tilt isn't available" toast stay
 
 // Creatures (Task 9). Sizes/speeds are playtest-owned tunables, not pinned by
 // any test — the suite only requires the id/kind/rare/x/y/phase shape.
-const CREATURE_SIZE = 34;          // base sprite edge in CSS px — rare gets a bit bigger below
+const CREATURE_SIZE = 44;          // base sprite edge in CSS px — rare gets a bit bigger below.
+                                   // 44, not 34: ~4 are on screen at any moment
+                                   // (measured), but at 34 they were too small
+                                   // and dim to register as living things.
 const CREATURE_RARE_BONUS = 8;     // px added to a rare creature's on-screen size
 const CREATURE_BUMPER_BONUS = 10;  // px added to a bumper's on-screen size — large at a glance
 const BUMP_RADIUS_M = 4.2;         // metres — a bumper is large, so its contact reach is generous

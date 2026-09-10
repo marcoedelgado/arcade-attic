@@ -40,13 +40,20 @@ uniform float uCalm;       // 0..1; every motion term below is scaled by this
 out vec4 outColor;
 
 // ---- TUNING ----
-const float RAY_STRENGTH   = 0.16;
-const float RAY_FADE_DEPTH = 400.0;  // god-rays gone by here
-const float CAUSTIC_SCALE  = 5.0;
-const float CAUSTIC_FADE   = 260.0;
-const float MOTE_DENSITY   = 34.0;
-const float MOTE_DRIFT     = 0.045;
-const float LAMP_SOFTNESS  = 0.85;
+const float RAY_STRENGTH    = 0.30;   // sunlight shafts — surface only, there is no sun in the deep
+const float RAY_FADE_DEPTH  = 400.0;
+const float CAUSTIC_SCALE   = 5.0;
+const float CAUSTIC_FADE    = 260.0;  // caustics weaken past here but never vanish
+const float CAUSTIC_FLOOR   = 0.30;   // how much shimmer survives in the deep
+const float DEEP_FADE_START = 150.0;  // the deep-water layers fade IN across this
+const float DEEP_FADE_END   = 900.0;  //   range, as the sunlit ones fade OUT
+const float HAZE_STRENGTH   = 0.16;   // slow drifting murk bands, deep only
+const float GLIMMER_STRENGTH = 0.55;  // distant bioluminescence, deep only
+const float SNOW_DENSITY    = 26.0;   // marine-snow grid (the near layer's scale)
+const float SNOW_DRIFT      = 0.045;
+const float LAMP_SOFTNESS   = 0.72;
+const float LAMP_LIFT       = 0.55;   // how much the lamp REVEALS what's already there
+const float LAMP_ON_SNOW    = 2.2;    // how much brighter flakes are inside the beam
 // ---- END TUNING ----
 
 // A well-conditioned integer-ish hash: two big odd uint multiplies and an XOR,
@@ -91,26 +98,53 @@ float caustics(vec2 uv, float t) {
   return n1 * 0.65 + n2 * 0.35;  // in [0, 1]
 }
 
-// Layer 4 — motes: hashed points on a grid scrolled through vUv.y by +t, which
-// reads as points drifting UP the screen over time (displayed(v, t) =
-// pattern(v + t) brings content from further down the pattern into a higher
-// screen position as t grows). That is deliberate: while the mote field itself
-// sinks slowly, the diver sinks faster, so relative to the diver the motes
-// stream past upward — this is what sells the descent.
-float motes(vec2 uv, float aspect, float t) {
-  vec2 p = vec2(uv.x * aspect, uv.y + t * MOTE_DRIFT) * MOTE_DENSITY;
+// Layer 3b — deep haze: very low-frequency noise bands drifting slowly upward.
+// This is what REPLACES the god-rays once there is no sun left to cast them,
+// so the deep still has structure moving through it instead of flat murk.
+float deepHaze(vec2 uv, float aspect, float t) {
+  vec2 p = vec2(uv.x * aspect * 0.9, uv.y * 1.7 + t * 0.02);
+  float n = valueNoise(p + vec2(t * 0.05, 0.0)) * 0.65
+          + valueNoise(p * 2.3 + vec2(31.0, t * 0.08)) * 0.35;
+  return smoothstep(0.45, 0.95, n);
+}
+
+// Layer 3c — glimmers: sparse bioluminescent points far off in the murk.
+// Bigger, dimmer and slower than marine snow, and they breathe rather than
+// twinkle, so they read as distant living things rather than dust.
+float glimmers(vec2 uv, float aspect, float t) {
+  vec2 p = vec2(uv.x * aspect, uv.y + t * 0.012) * 7.0;
   vec2 cell = floor(p);
   vec2 f = fract(p);
+  float h = hash21(cell + vec2(71.0, 13.0));
+  vec2 jitter = 0.25 + 0.5 * vec2(hash21(cell + vec2(5.0, 41.0)), hash21(cell + vec2(23.0, 2.0)));
+  float spot = 1.0 - smoothstep(0.0, 0.34, length(f - jitter));
+  float breathe = 0.35 + 0.65 * (0.5 + 0.5 * sin(t * 0.7 + h * 6.2831853));
+  return spot * step(0.90, h) * breathe;
+}
+
+// Layer 4 — marine snow. Scrolling vUv.y by +t reads as flakes drifting UP the
+// screen: the diver sinks faster than the field does, so relative to the diver
+// everything streams past upward.
+//
+// Three of these are summed at different scales and speeds. That parallax is
+// most of what separates "underwater" from "starfield" — a single uniform layer
+// of hard white points reads as stars no matter what colour the water is. Near
+// flakes are large, bright and fast; far ones small, dim and slow.
+float snowLayer(vec2 uv, float aspect, float t, float density, float drift, float radius, vec2 seed) {
+  vec2 p = vec2(uv.x * aspect, uv.y + t * drift) * density;
+  vec2 cell = floor(p) + seed;   // seed keeps the three layers decorrelated
+  vec2 f = fract(p);
   float h = hash21(cell);
-  // Keep the mote's centre away from the cell border (0.2..0.8 instead of
-  // 0..1) — otherwise more than half of all motes get sliced by the edge of
-  // their own cell, since the 0.16 dot radius only ever samples the home cell.
+  // Keep the flake's centre away from the cell border (0.2..0.8 instead of
+  // 0..1) — otherwise more than half get sliced by the edge of their own cell,
+  // since the radius only ever samples the home cell.
   vec2 jitter = 0.2 + 0.6 * vec2(hash21(cell + vec2(11.0, 7.0)), hash21(cell + vec2(3.0, 29.0)));
-  float d = length(f - jitter);
+  float r = radius * (0.55 + 0.45 * hash21(cell + vec2(17.0, 53.0)));  // per-flake size
   // named spot, not dot, so it doesn't shadow the builtin dot()
-  float spot = (1.0 - smoothstep(0.0, 0.16, d)) * step(0.82, h);  // ~18% of cells host a mote
-  float twinkle = 0.6 + 0.4 * sin(t * 2.0 + h * 6.2831853);       // stays positive
-  return spot * twinkle;
+  float spot = 1.0 - smoothstep(0.0, r, length(f - jitter));
+  float bright = 0.45 + 0.55 * hash21(cell + vec2(61.0, 19.0));        // per-flake brightness
+  float breathe = 0.7 + 0.3 * sin(t * 1.1 + h * 6.2831853);            // stays positive
+  return spot * step(0.80, h) * bright * breathe;
 }
 
 void main() {
@@ -124,32 +158,52 @@ void main() {
   float rayFade = 1.0 - smoothstep(0.0, RAY_FADE_DEPTH, uDepth);
   col += vec3(1.0, 0.97, 0.85) * rayShafts(vUv, t) * RAY_STRENGTH * rayFade;
 
-  // ---- layer 3: caustics, a brightness modulation fading by CAUSTIC_FADE ----
-  float causticFade = 1.0 - smoothstep(0.0, CAUSTIC_FADE, uDepth);
+  // ---- layer 3: caustics. Strong at the surface, but floored at
+  // CAUSTIC_FLOOR rather than fading to nothing — the old version reached zero
+  // at 260m (7.6 seconds in) and never came back, which is a large part of why
+  // the deep looked so empty. ----
+  float causticFade = mix(CAUSTIC_FLOOR, 1.0, 1.0 - smoothstep(0.0, CAUSTIC_FADE, uDepth));
   float causticMod = clamp(1.0 + (caustics(vUv, t) - 0.5) * 0.7 * causticFade, 0.0, 2.0);
   col *= causticMod;
 
-  // ---- layer 4: motes, present at every depth (no fade — this is the descent cue) ----
   float aspect = uResolution.x / max(uResolution.y, 1.0);
-  col += vec3(0.85, 0.92, 1.0) * motes(vUv, aspect, t) * 0.55;
 
-  // ---- layer 5: lamp interaction, drawn last so it lifts everything beneath it ----
+  // ---- layers 3b/3c: the deep-water pair, fading IN as the sunlit ones fade
+  // OUT. Every original layer faded out with depth, so past ~400m the water
+  // held only a gradient, dots and the lamp — three ingredients, forever. These
+  // two keep roughly three layers alive at EVERY depth instead. ----
+  float deep = smoothstep(DEEP_FADE_START, DEEP_FADE_END, uDepth);
+  col += top * deepHaze(vUv, aspect, t) * HAZE_STRENGTH * deep;
+  col += vec3(0.45, 0.85, 0.95) * glimmers(vUv, aspect, t) * GLIMMER_STRENGTH * deep;
+
+  // ---- layer 5a: the lamp's falloff, computed BEFORE the snow so that flakes
+  // inside the beam can catch the light. A lamp underwater is legible mostly
+  // because of what drifts through it, not because of the glow itself. ----
+  float glow = 0.0;
   if (uLamp.z > 0.0) {
     vec2 frag = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
     float d = distance(frag, uLamp.xy);
     // innerFrac is INVERTED from LAMP_SOFTNESS: a bigger LAMP_SOFTNESS means a
-    // SMALLER saturated core (innerFrac closer to 0) and a wider falloff band
-    // out to uLamp.z, because it is the falloff band's inner edge, not its
-    // size. At the shipped 0.85 that is a 0.15R core / 0.85R band, matching
-    // the pre-tuning-block lamp.
+    // SMALLER saturated core and a wider falloff band out to uLamp.z, because
+    // it is the band's inner edge, not its size.
     float innerFrac = clamp(1.0 - LAMP_SOFTNESS, 0.0, 0.95);
-    float glow = 1.0 - smoothstep(uLamp.z * innerFrac, uLamp.z, d);
-    // 0.5, not 0.9 — 0.9 clamped green/blue to 1.0 across the whole core in
-    // brighter zones (e.g. Sunlit Shallows' top ~= (0.15, 0.75, 0.85)), which
-    // washed out the rays/caustics/motes already baked into col instead of
-    // lifting them.
-    col += top * glow * 0.5 + vec3(0.03, 0.035, 0.045) * glow;
+    glow = 1.0 - smoothstep(uLamp.z * innerFrac, uLamp.z, d);
+    glow = glow * glow;   // squared: tighter core, much longer soft tail
   }
+  // Reveal the water that is already there rather than painting white over it.
+  col *= 1.0 + glow * LAMP_LIFT;
+
+  // ---- layer 4: marine snow, three parallax layers, at every depth. Brighter
+  // inside the beam — this is the cue that actually reads as "a lamp in water". ----
+  float snow =
+      snowLayer(vUv, aspect, t, SNOW_DENSITY * 2.1, SNOW_DRIFT * 0.35, 0.09, vec2(0.0, 0.0))   * 0.35
+    + snowLayer(vUv, aspect, t, SNOW_DENSITY * 1.3, SNOW_DRIFT * 0.70, 0.13, vec2(37.0, 91.0)) * 0.60
+    + snowLayer(vUv, aspect, t, SNOW_DENSITY * 0.7, SNOW_DRIFT * 1.35, 0.20, vec2(83.0, 11.0)) * 1.00;
+  col += vec3(0.82, 0.90, 1.0) * snow * 0.42 * (1.0 + glow * LAMP_ON_SNOW);
+
+  // A modest cool add so the beam still exists in near-black water, where there
+  // is nothing for the multiply above to reveal.
+  col += (top * 0.35 + vec3(0.04, 0.09, 0.11)) * glow;
 
   outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }

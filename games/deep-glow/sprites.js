@@ -188,19 +188,34 @@ function drawBlob(ctx, x, y, r, [red, grn, blu]) {
 // diver — a small fish silhouette facing +x with a lamp bulb on a forward stalk.
 // Everything is a radial gradient fading to zero: no strokes, no hard outline.
 function drawDiver(ctx, cx, cy) {
-  // Body: a soft blue-white ellipse, centre pulled slightly aft (-x).
+  // Bigger and higher-contrast than the first pass, which read as an
+  // indistinct smudge inside its own lamp glow. This is the character the
+  // player is meant to identify with, so it has to survive being the brightest
+  // area on screen: a solid opaque core, a readable silhouette, and an
+  // unambiguous nose-right facing so a child can tell which way it is pointing.
+
+  // Tail: a dim fan well behind the body, giving the silhouette a direction.
+  paintEllipse(ctx, cx - 30, cy, 15, 19, [96, 156, 196], 0.65);
+  paintEllipse(ctx, cx - 24, cy, 11, 13, [126, 186, 220], 0.8);
+
+  // Body: a broad soft halo, then an opaque core so the shape holds up against
+  // the lamp behind it instead of dissolving into it.
   const bx = cx - 6;
-  paintEllipse(ctx, bx, cy, 24, 13, [150, 205, 230], 1);
+  paintEllipse(ctx, bx, cy, 32, 19, [120, 180, 215], 0.55);
+  paintEllipse(ctx, bx, cy, 25, 14, [186, 226, 244], 1);
+  paintEllipse(ctx, bx - 2, cy - 3, 16, 6, [236, 250, 255], 0.9);  // dorsal highlight
 
-  // Tail: a dimmer fan trailing behind the body.
-  paintEllipse(ctx, bx - 22, cy, 12, 15, [110, 170, 205], 0.7);
+  // A dark eye — the single cheapest thing that turns a blob into a creature.
+  drawBlob(ctx, cx + 7, cy - 2, 3.2, [16, 30, 48]);
 
-  // Stalk: a faint thin taper from the snout forward to the bulb.
-  paintEllipse(ctx, cx + 20, cy - 6, 12, 3, [180, 210, 225], 0.5);
+  // Stalk: a thin taper from the snout forward to the bulb.
+  paintEllipse(ctx, cx + 21, cy - 7, 13, 3, [198, 226, 240], 0.6);
 
-  // Lamp bulb: the brightest thing in the cell, warm white, on the forward stalk.
-  drawBlob(ctx, cx + 30, cy - 9, 11, [255, 246, 222]);
-  drawBlob(ctx, cx + 30, cy - 9, 5, [255, 255, 255]);
+  // Lamp bulb: the brightest point in the whole atlas, warm white, with a
+  // tight white centre so it stays a distinct point rather than a soft wash.
+  drawBlob(ctx, cx + 32, cy - 11, 14, [255, 240, 200]);
+  drawBlob(ctx, cx + 32, cy - 11, 8, [255, 250, 232]);
+  drawBlob(ctx, cx + 32, cy - 11, 4, [255, 255, 255]);
 }
 
 // ---- Creature art (Task 9) --------------------------------------------------

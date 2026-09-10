@@ -121,10 +121,25 @@ export function paletteAt(metres) {
 
   const next = ZONES[nextIndex];
 
+  // Hold this zone's OWN colour for the first HOLD of its length, then blend
+  // across the remainder. Blending linearly over the whole zone (which is what
+  // this used to do) meant you were almost always in transition and never
+  // actually *in* a place: at 5178m — 89% through The Trench — the volcanic red
+  // #590a03 had already blended 89% of the way to the next zone's blue, so the
+  // screen read #151366 navy. Every zone looked like the same colour because
+  // every zone spent nearly all its time showing the next one's.
+  //
+  // Continuity across boundaries is unaffected, which is what keeps the
+  // loop-seam test green: at progress 1 this resolves to exactly next.colour,
+  // and the following zone starts at progress 0 showing that same colour.
+  const HOLD = 0.7;
+  const t = progress <= HOLD ? 0 : (progress - HOLD) / (1 - HOLD);
+  const mix = t * t * (3 - 2 * t);   // smoothstep, so the handover has no corner
+
   return {
     a: current.colour,
     b: next.colour,
-    mix: progress,
+    mix,
   };
 }
 
