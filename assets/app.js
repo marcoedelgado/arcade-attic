@@ -64,7 +64,12 @@ function renderGrid(root, games) {
     const card = document.createElement('a');
     card.className = 'aa-card';
     card.href = `games/${slug}/`;
+    // A game still being worked on wears a sticker. Set "status": "in-progress"
+    // in games.json to add one; delete that line to take it off again.
+    const wip = game.status === 'in-progress';
+    if (wip) card.classList.add('is-wip');
     card.innerHTML = `
+      ${wip ? '<span class="aa-card-sticker">In progress</span>' : ''}
       <span class="aa-card-emoji">${escape(game.emoji ?? '🎮')}</span>
       <span class="aa-card-title">${escape(game.title ?? slug)}</span>
       <p class="aa-card-desc">${escape(game.description ?? '')}</p>

@@ -153,6 +153,32 @@ a { color: var(--neon-blue); }
   color: var(--edge);
 }
 
+/* ---------- "In progress" sticker ---------- */
+/* Slapped on a card by games.json's "status": "in-progress". Sits over the
+   card's top-right corner, tilted like a real sticker. */
+.aa-card.is-wip {
+  position: relative;
+  overflow: hidden;          /* keeps the tilted corner inside the rounded card */
+}
+.aa-card-sticker {
+  position: absolute;
+  top: 12px;
+  right: -34px;
+  transform: rotate(35deg);
+  width: 130px;
+  padding: 4px 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--attic-deep);
+  background: var(--neon-pink);
+  border: 2px solid var(--attic-deep);
+  box-shadow: 0 2px 0 rgba(15, 12, 30, 0.45);
+  pointer-events: none;      /* never steals the card's click */
+}
+
 /* ---------- Empty state ---------- */
 .aa-empty {
   text-align: center;
