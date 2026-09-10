@@ -16,6 +16,7 @@ import { makeLamp, REFUEL } from './lamp.js';
 import { takePlankton, bumped, sighted } from './collect.js';
 import { makeSightings } from './sightings.js';
 import { makeAudio } from './audio.js';
+import { makeTilt, tiltPreferred } from './tilt.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 64;         // sprite edge in CSS px (scaled by DPR at draw time)
@@ -28,6 +29,7 @@ const GLOW_SCALE = 2.4;        // lamp sprite edge as a multiple of the lamp's p
 const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
 const BEST_KEY = 'deep-glow:best';
+const TILT_MSG_SECONDS = 3;    // how long the "tilt isn't available" toast stays up
 
 // Creatures (Task 9). Sizes/speeds are playtest-owned tunables, not pinned by
 // any test — the suite only requires the id/kind/rare/x/y/phase shape.
@@ -419,6 +421,70 @@ if (!glx) {
     // live while diving.
     const inputLocked = () => state !== STATE.DIVING;
 
+    // Tilt (Task 12): off by default, drag is always the primary control. The
+    // two inputs are never blended — precedence lives inside tilt.js itself
+    // (a drag overrides tilt entirely for DRAG_OVERRIDE_MS after release), so
+    // wiring here just forwards the same aim() a drag would call, gated by
+    // the same inputLocked() a drag is gated by.
+    const tilt = makeTilt({
+      onAim: (sx, sy) => {
+        if (inputLocked()) return;
+        diver.aim(sx, sy);
+      },
+      getViewport: cssViewport,
+    });
+    const tiltBtn = document.getElementById('dg-tilt');
+    const tiltMsgEl = document.getElementById('dg-tilt-msg');
+    let tiltMsgTimer = null;
+
+    function showTiltMsg(text) {
+      if (!tiltMsgEl) return;
+      clearTimeout(tiltMsgTimer);
+      tiltMsgEl.textContent = text;
+      tiltMsgEl.hidden = false;
+      tiltMsgTimer = setTimeout(() => { tiltMsgEl.hidden = true; }, TILT_MSG_SECONDS * 1000);
+    }
+
+    function syncTiltBtn() {
+      if (!tiltBtn) return;
+      if (!tilt.supported) {
+        tiltBtn.disabled = true;
+        tiltBtn.textContent = '📴';
+        tiltBtn.setAttribute('aria-pressed', 'false');
+        tiltBtn.setAttribute('aria-label', 'Tilt steering unavailable in this browser');
+        return;
+      }
+      tiltBtn.setAttribute('aria-pressed', String(tilt.enabled));
+      tiltBtn.setAttribute('aria-label', tilt.enabled ? 'Turn off tilt steering' : 'Turn on tilt steering');
+      tiltBtn.textContent = tilt.enabled ? '📲' : '📴';
+    }
+    syncTiltBtn();
+
+    if (tiltBtn && tilt.supported) {
+      tiltBtn.addEventListener('click', () => {
+        if (tilt.enabled) {
+          tilt.disable();
+          syncTiltBtn();
+          return;
+        }
+        // enable() is called directly from this click, synchronously — not
+        // after any other await — because iOS only honours the permission
+        // prompt when the request happens inside the gesture's own call stack.
+        tilt.enable().then((ok) => {
+          syncTiltBtn();
+          if (!ok) showTiltMsg("Tilt isn't available on this device.");
+        });
+      });
+
+      // A stored preference from an earlier visit gets one silent best-effort
+      // attempt, never a fresh prompt: this call runs outside any user gesture,
+      // so on iOS it simply fails quietly (enable() resolves false) and the
+      // toggle stays off until the player taps it themselves. On platforms with
+      // no permission gate (desktop, most Android) this is what actually
+      // restores tilt across reloads. No toast here — this isn't a tap.
+      if (tiltPreferred()) tilt.enable().then(syncTiltBtn);
+    }
+
     function pointerPos(e) {
       const rect = canvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -429,6 +495,7 @@ if (!glx) {
       try { canvas.setPointerCapture(e.pointerId); } catch { /* not all engines */ }
       const p = pointerPos(e);
       diver.aim(p.x, p.y);
+      tilt.noteDrag();   // this drag now outranks tilt for DRAG_OVERRIDE_MS after release
     });
     canvas.addEventListener('pointermove', (e) => {
       // No pressure/button gate: a touch pointermove only fires while the finger is
@@ -436,6 +503,7 @@ if (!glx) {
       if (inputLocked()) return;
       const p = pointerPos(e);
       diver.aim(p.x, p.y);
+      tilt.noteDrag();
     });
 
     const keys = { ArrowLeft: 0, ArrowRight: 0, ArrowUp: 0, ArrowDown: 0, a: 0, d: 0, w: 0, s: 0 };

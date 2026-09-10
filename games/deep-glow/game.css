@@ -46,6 +46,44 @@ body { overscroll-behavior: contain; }
   box-shadow: none;
 }
 
+/* Tilt toggle — HUD corner, top-left of the stage, mirroring the mute button. */
+.dg-tilt {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 6px 10px;
+  font-size: 1rem;
+  line-height: 1;
+}
+.dg-tilt:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+.dg-tilt:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Brief "tilt isn't available" toast — anchored under the tilt button so it
+   never covers the diver or blocks the drag that keeps working underneath it. */
+.dg-tilt-msg {
+  position: absolute;
+  top: 46px;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(6, 12, 24, 0.72);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
 .dg-fallback {
   position: absolute;
   inset: 0;
