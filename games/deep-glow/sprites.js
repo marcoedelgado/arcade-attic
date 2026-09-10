@@ -22,8 +22,22 @@ const COLS = ATLAS / CELL; // 8
 const MASK_SOLID = 40; // fully opaque out to here
 const MASK_ZERO = 56; // fully transparent from here to the border (8px clear margin)
 
-// Grid slots, in draw order. Row 0 for now; later tasks append more ids.
-const LAYOUT = ['diver', 'plankton-a', 'plankton-b', 'plankton-c', 'lamp-glow'];
+// Grid slots, in draw order. Row 0 is the diver + plankton + lamp glow from
+// earlier tasks; Task 9 appends one frame per creature id in depth.js's ZONES,
+// grouped by zone (5 zones x 3 creatures = 15 ids), row 1 onward.
+const LAYOUT = [
+  'diver', 'plankton-a', 'plankton-b', 'plankton-c', 'lamp-glow',
+  // Sunlit Shallows
+  'bubble-fish', 'silver-dart', 'sunfish',
+  // The Blue
+  'blue-dancer', 'phantom-squid', 'electric-eel',
+  // The Twilight
+  'lantern-jelly', 'shadow-fish', 'anglerfish',
+  // The Midnight
+  'glowing-squid', 'depth-lurker', 'fangtooth',
+  // The Trench
+  'vent-worm', 'black-smoker', 'giant-octopus',
+];
 
 let built = null;
 
@@ -83,6 +97,36 @@ function drawCell(id) {
     drawBlob(ctx, cx, cy, 32, [255, 214, 168]); // largest, amber
   } else if (id === 'lamp-glow') {
     drawGlow(ctx, cx, cy); // the lamp's pool of light — scaled way up in-game
+  } else if (id === 'bubble-fish') {
+    drawBubbleFish(ctx, cx, cy);
+  } else if (id === 'silver-dart') {
+    drawSilverDart(ctx, cx, cy);
+  } else if (id === 'sunfish') {
+    drawSunfish(ctx, cx, cy);
+  } else if (id === 'blue-dancer') {
+    drawBlueDancer(ctx, cx, cy);
+  } else if (id === 'phantom-squid') {
+    drawPhantomSquid(ctx, cx, cy);
+  } else if (id === 'electric-eel') {
+    drawElectricEel(ctx, cx, cy);
+  } else if (id === 'lantern-jelly') {
+    drawLanternJelly(ctx, cx, cy);
+  } else if (id === 'shadow-fish') {
+    drawShadowFish(ctx, cx, cy);
+  } else if (id === 'anglerfish') {
+    drawAnglerfish(ctx, cx, cy);
+  } else if (id === 'glowing-squid') {
+    drawGlowingSquid(ctx, cx, cy);
+  } else if (id === 'depth-lurker') {
+    drawDepthLurker(ctx, cx, cy);
+  } else if (id === 'fangtooth') {
+    drawFangtooth(ctx, cx, cy);
+  } else if (id === 'vent-worm') {
+    drawVentWorm(ctx, cx, cy);
+  } else if (id === 'black-smoker') {
+    drawBlackSmoker(ctx, cx, cy);
+  } else if (id === 'giant-octopus') {
+    drawGiantOctopus(ctx, cx, cy);
   }
 
   // THE GUARANTEE: keep only what falls inside the safe disc, fading to a hard
@@ -144,6 +188,98 @@ function drawDiver(ctx, cx, cy) {
   // Lamp bulb: the brightest thing in the cell, warm white, on the forward stalk.
   drawBlob(ctx, cx + 30, cy - 9, 11, [255, 246, 222]);
   drawBlob(ctx, cx + 30, cy - 9, 5, [255, 255, 255]);
+}
+
+// ---- Creature art (Task 9) --------------------------------------------------
+// Same rules as the diver and the plankton blobs above: only paintEllipse (a
+// soft axis-aligned ellipse) and drawBlob (a soft radial dot) — no strokes, no
+// hard edges — and the destination-in mask in drawCell() guarantees a clean
+// fade to zero before the cell border either way. Each zone's family leans on
+// its zone colour (depth.js ZONES[].colour) lifted to something legible against
+// black; rare creatures (sunfish, electric-eel, anglerfish, fangtooth,
+// giant-octopus) get one extra bright accent so they read as special at a
+// glance, at the ~30px on-screen size these are actually seen at.
+
+// Sunlit Shallows — bright cyan family.
+function drawBubbleFish(ctx, cx, cy) {
+  paintEllipse(ctx, cx - 20, cy, 10, 12, [70, 150, 170], 0.6);   // tail
+  paintEllipse(ctx, cx, cy, 22, 13, [140, 230, 235], 1);          // body
+  drawBlob(ctx, cx + 6, cy - 16, 6, [220, 255, 250]);             // rising bubbles
+  drawBlob(ctx, cx + 14, cy - 24, 4, [220, 255, 250]);
+}
+function drawSilverDart(ctx, cx, cy) {               // shy — sleek, no tail, quick to read
+  paintEllipse(ctx, cx, cy, 26, 7, [225, 240, 250], 1);
+  drawBlob(ctx, cx + 20, cy, 4, [255, 255, 255]);
+}
+function drawSunfish(ctx, cx, cy) {                  // rare — big warm disc
+  drawBlob(ctx, cx, cy, 34, [255, 214, 120]);
+  paintEllipse(ctx, cx, cy, 30, 22, [255, 236, 180], 0.6);
+  drawBlob(ctx, cx, cy, 12, [255, 250, 220]);
+}
+
+// The Blue — mid ocean blue family.
+function drawBlueDancer(ctx, cx, cy) {
+  paintEllipse(ctx, cx - 18, cy, 9, 10, [50, 100, 190], 0.5);
+  paintEllipse(ctx, cx, cy, 20, 10, [110, 170, 235], 1);
+}
+function drawPhantomSquid(ctx, cx, cy) {             // shy — pale, translucent, trailing tentacles
+  paintEllipse(ctx, cx, cy - 6, 18, 16, [190, 215, 255], 0.55);
+  drawBlob(ctx, cx - 10, cy + 16, 5, [180, 210, 255]);
+  drawBlob(ctx, cx, cy + 20, 5, [180, 210, 255]);
+  drawBlob(ctx, cx + 10, cy + 16, 5, [180, 210, 255]);
+}
+function drawElectricEel(ctx, cx, cy) {              // rare — long body, bright spark accents
+  paintEllipse(ctx, cx, cy, 30, 7, [90, 170, 230], 0.9);
+  drawBlob(ctx, cx - 10, cy, 4, [255, 255, 190]);
+  drawBlob(ctx, cx + 10, cy, 4, [255, 255, 190]);
+}
+
+// The Twilight — indigo/violet family.
+function drawLanternJelly(ctx, cx, cy) {
+  paintEllipse(ctx, cx, cy + 4, 20, 16, [120, 100, 210], 0.6);
+  drawBlob(ctx, cx, cy - 10, 9, [255, 235, 190]);     // the lantern
+}
+function drawShadowFish(ctx, cx, cy) {               // shy — dim, easy to lose in the dark
+  paintEllipse(ctx, cx - 16, cy, 8, 9, [50, 40, 100], 0.35);
+  paintEllipse(ctx, cx, cy, 20, 11, [90, 75, 160], 0.5);
+}
+function drawAnglerfish(ctx, cx, cy) {               // rare — dark body, one very bright lure
+  paintEllipse(ctx, cx, cy, 24, 15, [60, 45, 90], 0.6);
+  drawBlob(ctx, cx + 22, cy - 12, 7, [255, 250, 210]);
+}
+
+// The Midnight — deep violet-black family.
+function drawGlowingSquid(ctx, cx, cy) {
+  paintEllipse(ctx, cx, cy - 6, 16, 15, [90, 60, 160], 0.55);
+  drawBlob(ctx, cx - 8, cy + 16, 4, [150, 220, 255]); // glowing tentacle tips
+  drawBlob(ctx, cx + 8, cy + 16, 4, [150, 220, 255]);
+}
+function drawDepthLurker(ctx, cx, cy) {              // shy — barely there
+  paintEllipse(ctx, cx, cy, 22, 10, [45, 30, 70], 0.3);
+  drawBlob(ctx, cx + 14, cy, 3, [120, 150, 210]);
+}
+function drawFangtooth(ctx, cx, cy) {                // rare — dark body, bright teeth accent
+  paintEllipse(ctx, cx, cy, 20, 13, [90, 20, 25], 0.6);
+  drawBlob(ctx, cx + 8, cy + 3, 3, [255, 255, 255]);
+  drawBlob(ctx, cx + 14, cy + 3, 3, [255, 255, 255]);
+}
+
+// The Trench — ember red/orange family.
+function drawVentWorm(ctx, cx, cy) {                 // vertical tube, bright plume tip
+  paintEllipse(ctx, cx, cy, 8, 26, [180, 70, 30], 0.7);
+  drawBlob(ctx, cx, cy - 22, 7, [255, 150, 60]);
+}
+function drawBlackSmoker(ctx, cx, cy) {              // shy — smoky, low-alpha, one vent glow
+  paintEllipse(ctx, cx, cy, 22, 18, [60, 25, 15], 0.35);
+  drawBlob(ctx, cx, cy - 6, 8, [255, 130, 50]);
+}
+function drawGiantOctopus(ctx, cx, cy) {             // rare — big warm body, four limb accents
+  drawBlob(ctx, cx, cy, 30, [230, 90, 40]);
+  paintEllipse(ctx, cx, cy, 26, 20, [255, 140, 90], 0.5);
+  drawBlob(ctx, cx - 18, cy + 14, 6, [230, 90, 40]);
+  drawBlob(ctx, cx + 18, cy + 14, 6, [230, 90, 40]);
+  drawBlob(ctx, cx - 10, cy + 22, 5, [230, 90, 40]);
+  drawBlob(ctx, cx + 10, cy + 22, 5, [230, 90, 40]);
 }
 
 // An axis-aligned soft ellipse via a scaled radial gradient.

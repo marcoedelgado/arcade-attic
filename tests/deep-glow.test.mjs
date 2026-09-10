@@ -5,6 +5,7 @@ import { makeDiver } from '../games/deep-glow/diver.js';
 import { makeField } from '../games/deep-glow/field.js';
 import { makeLamp } from '../games/deep-glow/lamp.js';
 import { takePlankton, bumped, sighted } from '../games/deep-glow/collect.js';
+import { makeSightings } from '../games/deep-glow/sightings.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -281,4 +282,34 @@ test('collect: a rare creature counts as seen only within lamp radius', () => {
 test('collect: non-rare creatures are never reported as sightings', () => {
   const creatures = [{ id: 'drifter', rare: false, x: 0, y: 0 }];
   assert.deepEqual(sighted({ x: 0, y: 0 }, creatures, 500), []);
+});
+
+function fakeStorage() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
+}
+const throwingStorage = {
+  getItem() { throw new Error('SecurityError'); },
+  setItem() { throw new Error('SecurityError'); },
+};
+
+test('sightings: round-trips through storage', () => {
+  const s = fakeStorage();
+  const a = makeSightings({ storage: s });
+  a.mark('lantern-jelly');
+  assert.ok(makeSightings({ storage: s }).has('lantern-jelly'), 'did not persist');
+});
+
+test('sightings: marking twice is idempotent', () => {
+  const a = makeSightings({ storage: fakeStorage() });
+  a.mark('x'); a.mark('x');
+  assert.equal(a.all().length, 1);
+});
+
+test('sightings: a throwing storage never crashes the game', () => {
+  assert.doesNotThrow(() => {
+    const a = makeSightings({ storage: throwingStorage });
+    a.mark('anything');
+    assert.equal(a.has('anything'), true, 'should still work in memory for this session');
+  });
 });

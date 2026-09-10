@@ -13,7 +13,8 @@ import { makeLoop } from './loop.js';
 import { makeDiver } from './diver.js';
 import { makeField } from './field.js';
 import { makeLamp, REFUEL } from './lamp.js';
-import { takePlankton } from './collect.js';
+import { takePlankton, bumped, sighted } from './collect.js';
+import { makeSightings } from './sightings.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 64;         // sprite edge in CSS px (scaled by DPR at draw time)
@@ -26,6 +27,26 @@ const GLOW_SCALE = 2.4;        // lamp sprite edge as a multiple of the lamp's p
 const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
 const BEST_KEY = 'deep-glow:best';
+
+// Creatures (Task 9). Sizes/speeds are playtest-owned tunables, not pinned by
+// any test — the suite only requires the id/kind/rare/x/y/phase shape.
+const CREATURE_SIZE = 34;          // base sprite edge in CSS px — rare gets a bit bigger below
+const CREATURE_RARE_BONUS = 8;     // px added to a rare creature's on-screen size
+const BUMP_RADIUS_M = 4.2;         // metres — a bumper is large, so its contact reach is generous
+const BUMP_COOLDOWN_SECONDS = 0.5; // after a bump, no further bump is scored for this long — a
+                                    // lingering overlap costs fuel once, not every frame
+const WOBBLE_SECONDS = 0.28;       // how long the screen shake from a bump lasts
+const WOBBLE_PX = 5;               // CSS px of screen-shake amplitude at the start of a wobble
+const SHY_FLEE_PX_PER_S = 150;     // how fast a shy creature darts once the lamp reaches it
+const CAPTION_SECONDS = 2.5;       // how long a sighting caption stays on screen
+// Per-kind cosmetic sway at render time — same idea as PLANKTON_DRIFT, applied
+// to creatures instead. Amplitude in CSS px, period in ms. Purely visual: it
+// never touches the creature's real x, which is what bump/sighted compare.
+const CREATURE_SWAY = {
+  drifter: { amp: 10, period: 2600 },
+  shy: { amp: 4, period: 900 },
+  bumper: { amp: 3, period: 3400 },
+};
 
 // State machine: menu -> diving -> brownout -> diving. Task 13 adds the real
 // `menu` state (title, best score, a Dive button) and makes it the start state;
@@ -67,11 +88,22 @@ if (!glx) {
     const field = makeField({ rng: Math.random });   // pure; the rng is defaulted here, at the call site
     const lamp = makeLamp();
     const loop = makeLoop();
+    // sightings.js wraps every storage access itself; localStorage is just the
+    // real-world default handed in at this call site, same pattern as readBest/writeBest.
+    const sightings = makeSightings({ storage: localStorage });
+    const captionEl = document.getElementById('dg-caption');
 
     let depthM = 0;
     let state = STATE.DIVING;   // Task 13: start at STATE.MENU instead
     let brownoutT = 0;          // seconds elapsed in the current brownout drift
     let best = readBest();
+
+    // Bump wobble and sighting caption both run on a simple decaying timer,
+    // ticked once per frame regardless of state so they always finish fading.
+    let wobbleT = 0;            // seconds remaining in the current screen shake
+    let bumpCooldownT = 0;      // seconds remaining before another bump can score
+    let captionT = 0;           // seconds remaining the current caption is shown
+    let captionId = null;       // creature id the caption is currently naming
 
     // One lamp snapshot per frame — fuel, light radius, and the one-frame
     // brownout latch. Seeded so render() has real numbers before the first tick.
@@ -103,11 +135,88 @@ if (!glx) {
       }
     }
 
+    // Reused scratch for bumper contacts — same metres-projection as pickScratch,
+    // truncated/rebuilt each call so nothing is allocated once warm. Only
+    // 'bumper'-kind creatures are ever copied in: collect.js's bumped() does not
+    // consult kind ("a bump is a bump"), so the caller decides who can bump —
+    // that's here, not in collect.js.
+    const bumperScratch = [];
+
+    // creature id -> a human caption ("giant-octopus" -> "Giant Octopus"). Every
+    // id sighted() ever returns is a rare id from depth.js's ZONES, and their ids
+    // are already lowercase-hyphenated words — no lookup table needed.
+    function creatureName(id) {
+      return id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    function showCaption(id) {
+      captionId = id;
+      captionT = CAPTION_SECONDS;
+      if (captionEl) {
+        captionEl.textContent = creatureName(id);
+        captionEl.hidden = false;
+      }
+    }
+
+    // Bump/sighting interactions for this frame's creatures. Must run AFTER
+    // collectPickups(), which is what sets diverMetres for this tick.
+    function updateCreatureInteractions(dt) {
+      const list = field.creatures;
+      const lampRadiusM = lampSnap.radius / PX_PER_METRE;
+
+      // Sightings: sighted() already filters to rare creatures, so every id
+      // that comes back is one the log and the caption care about. Marking is
+      // idempotent, so calling it every frame the lamp still reaches the
+      // creature is free; the caption re-fires only on a new id or after the
+      // previous one has finished showing.
+      for (const id of sighted(diverMetres, list, lampRadiusM)) {
+        sightings.mark(id);
+        if (captionT <= 0 || captionId !== id) showCaption(id);
+      }
+
+      // Bumper contact: costs lamp fuel and shakes the screen, but never ends
+      // the run. A short cooldown after a hit stops a lingering overlap from
+      // draining fuel again on every single frame it persists.
+      if (bumpCooldownT <= 0) {
+        let n = 0;
+        for (const c of list) {
+          if (c.kind !== 'bumper') continue;
+          let s = bumperScratch[n];
+          if (!s) s = bumperScratch[n] = { x: 0, y: 0 };
+          s.x = c.x / PX_PER_METRE;
+          s.y = c.y;
+          n++;
+        }
+        bumperScratch.length = n;
+        if (bumped(diverMetres, bumperScratch, BUMP_RADIUS_M).length > 0) {
+          lamp.bump();
+          wobbleT = WOBBLE_SECONDS;
+          bumpCooldownT = BUMP_COOLDOWN_SECONDS;
+        }
+      }
+
+      // Shy creatures dart away once the lamp actually reaches them. This
+      // mutates the real x field.js gave the creature (not a render-time
+      // offset), so a fleeing creature also moves the point bump/sighted
+      // compare against next frame — it is genuinely escaping, not just
+      // appearing to.
+      for (const c of list) {
+        if (c.kind !== 'shy') continue;
+        const dx = (c.x - diver.pos().x) / PX_PER_METRE;
+        const dy = c.y - depthM;
+        if (dx * dx + dy * dy > lampRadiusM * lampRadiusM) continue;
+        const dir = dx !== 0 ? Math.sign(dx) : (c.phase > Math.PI ? 1 : -1);
+        c.x += dir * SHY_FLEE_PX_PER_S * dt;
+      }
+    }
+
     // Hoisted so the per-frame push() allocates nothing. `sprite` is the diver's;
-    // `mote` is reused across the WHOLE plankton loop — many pushes per frame, one
-    // object. `fieldCtx` is filled once per frame, never per mote.
+    // `mote` is reused across the WHOLE plankton loop, `critter` across the whole
+    // creature loop — many pushes per frame, one object each. `fieldCtx` is
+    // filled once per frame, never per mote/creature.
     const sprite = { id: 'diver', x: 0, y: 0, size: DIVER_SIZE, r: 1, g: 1, b: 1, alpha: 1, rot: 0 };
     const mote = { id: 'plankton-a', x: 0, y: 0, size: PLANKTON_SIZE, r: 1, g: 0.92, b: 0.72, alpha: 0.9, rot: 0 };
+    const critter = { id: 'bubble-fish', x: 0, y: 0, size: CREATURE_SIZE, r: 1, g: 1, b: 1, alpha: 0.95, rot: 0 };
     const glow = { id: 'lamp-glow', x: 0, y: 0, size: 0, r: 1, g: 1, b: 1, alpha: 0.55, rot: 0 };
     const fieldCtx = { box: null, viewMetres: 0, cast: null, escalation: 1 };
 
@@ -119,9 +228,17 @@ if (!glx) {
       const { width, height, dpr } = glx.resize();
       const pal = paletteAt(depthM);
 
+      // A bumper contact shakes the whole scene for WOBBLE_SECONDS, decaying
+      // linearly to nothing. centreX replaces width/2 everywhere below (diver,
+      // plankton, creatures, lamp glow) so every actor shakes together, not just
+      // the diver sprite.
+      const shakeK = wobbleT > 0 ? wobbleT / WOBBLE_SECONDS : 0;
+      const shakePx = shakeK > 0 ? Math.sin(performance.now() / 35) * WOBBLE_PX * shakeK : 0;
+      const centreX = width / 2 + shakePx * dpr;
+
       // Diver + lamp in device pixels (top-left origin), shared by the medium
       // pass, the actor batch, and the lamp quad.
-      const diverX = width / 2 + diver.pos().x * dpr;
+      const diverX = centreX + diver.pos().x * dpr;
       const diverY = height * DIVER_SCREEN_Y;
       const lampRadiusPx = lampSnap.radius * dpr;
 
@@ -154,10 +271,24 @@ if (!glx) {
       const now = performance.now();
       for (const p of field.plankton) {
         mote.id = p.kind;
-        mote.x = width / 2 + (p.x + Math.sin(now / 1000 + p.phase) * PLANKTON_DRIFT) * dpr;
+        mote.x = centreX + (p.x + Math.sin(now / 1000 + p.phase) * PLANKTON_DRIFT) * dpr;
         mote.y = height * DIVER_SCREEN_Y + (p.y - depthM) * PX_PER_METRE * dpr;
         mote.size = PLANKTON_SIZE * dpr;
         batch.push(mote);
+      }
+
+      // Creatures: same world->screen projection as plankton, with a per-kind
+      // cosmetic sway (CREATURE_SWAY) standing in for PLANKTON_DRIFT. This sway
+      // never touches c.x itself — a fleeing 'shy' creature's real x already
+      // moved in updateCreatureInteractions(); this is purely the on-screen wobble
+      // layered on top, same as plankton's.
+      for (const c of field.creatures) {
+        critter.id = c.id;
+        const sway = CREATURE_SWAY[c.kind] || CREATURE_SWAY.drifter;
+        critter.x = centreX + (c.x + Math.sin(now / sway.period + c.phase) * sway.amp) * dpr;
+        critter.y = height * DIVER_SCREEN_Y + (c.y - depthM) * PX_PER_METRE * dpr;
+        critter.size = (CREATURE_SIZE + (c.rare ? CREATURE_RARE_BONUS : 0)) * dpr;
+        batch.push(critter);
       }
 
       sprite.x = diverX;
@@ -182,6 +313,19 @@ if (!glx) {
     }
 
     loop.start((dt) => {
+      // Decay the bump wobble, its cooldown, and the sighting caption every
+      // frame regardless of state, so a bump right before a brownout still
+      // finishes fading instead of freezing mid-shake.
+      if (wobbleT > 0) wobbleT = Math.max(0, wobbleT - dt);
+      if (bumpCooldownT > 0) bumpCooldownT = Math.max(0, bumpCooldownT - dt);
+      if (captionT > 0) {
+        captionT = Math.max(0, captionT - dt);
+        if (captionT === 0) {
+          captionId = null;
+          if (captionEl) captionEl.hidden = true;
+        }
+      }
+
       if (state === STATE.MENU) { render(); return; }   // Task 13 fills this in
 
       const prevDepthM = depthM;
@@ -197,7 +341,8 @@ if (!glx) {
         lampSnap.radius = s.radius;
         lampSnap.brownout = s.brownout;
 
-        collectPickups();                       // splices motes, refuels per mote
+        collectPickups();                       // splices motes, refuels per mote, sets diverMetres
+        updateCreatureInteractions(dt);         // bumper fuel cost + wobble, rare sightings + caption
 
         if (depthM > best) best = depthM;
 

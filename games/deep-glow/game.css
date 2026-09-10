@@ -36,3 +36,25 @@ body { overscroll-behavior: contain; }
   border-radius: var(--radius);
   color: var(--ink);
 }
+
+/* A short caption naming a rare creature just sighted — a small pill anchored
+   to the bottom of the stage, never blocking the drag/tap that steers it. */
+.dg-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(6, 12, 24, 0.72);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
