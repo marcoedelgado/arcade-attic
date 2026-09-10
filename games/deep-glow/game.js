@@ -667,7 +667,9 @@ if (!glx) {
     // Guarded because document.fonts is missing on some engines — on those,
     // the resize/scroll/DPR triggers above still cover the normal cases.
     try {
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(measure).catch(() => { /* measure() is unlikely to throw; keep the console clean either way */ });
+      }
     } catch { /* no Font Loading API — the resize/scroll refreshes still cover us */ }
 
     // Persist the best depth when the page goes away mid-dive — a brownout is the
