@@ -22,6 +22,12 @@ void main() {
 
 const FRAG_SRC = `#version 300 es
 precision highp float;
+// hash21 below builds a uvec2 from 32-bit constants — the fragment stage
+// defaults to mediump int/uint (mediump uint is only guaranteed 16 bits),
+// which would silently truncate that hash to near-zero on real phone GPUs
+// (Mali etc.) even though it looks perfect on desktop/ANGLE, where mediump
+// is 32-bit anyway. highp int is mandatory in ES 3.00, so this is free.
+precision highp int;
 in vec2 vUv;
 uniform vec3 uZoneA;
 uniform vec3 uZoneB;
@@ -40,7 +46,7 @@ const float CAUSTIC_SCALE  = 5.0;
 const float CAUSTIC_FADE   = 260.0;
 const float MOTE_DENSITY   = 34.0;
 const float MOTE_DRIFT     = 0.045;
-const float LAMP_SOFTNESS  = 0.55;
+const float LAMP_SOFTNESS  = 0.85;
 // ---- END TUNING ----
 
 // A well-conditioned integer-ish hash: two big odd uint multiplies and an XOR,
@@ -96,11 +102,15 @@ float motes(vec2 uv, float aspect, float t) {
   vec2 cell = floor(p);
   vec2 f = fract(p);
   float h = hash21(cell);
-  vec2 jitter = vec2(hash21(cell + vec2(11.0, 7.0)), hash21(cell + vec2(3.0, 29.0)));
+  // Keep the mote's centre away from the cell border (0.2..0.8 instead of
+  // 0..1) — otherwise more than half of all motes get sliced by the edge of
+  // their own cell, since the 0.16 dot radius only ever samples the home cell.
+  vec2 jitter = 0.2 + 0.6 * vec2(hash21(cell + vec2(11.0, 7.0)), hash21(cell + vec2(3.0, 29.0)));
   float d = length(f - jitter);
-  float dot = (1.0 - smoothstep(0.0, 0.16, d)) * step(0.82, h);  // ~18% of cells host a mote
-  float twinkle = 0.6 + 0.4 * sin(t * 2.0 + h * 6.2831853);      // stays positive
-  return dot * twinkle;
+  // named spot, not dot, so it doesn't shadow the builtin dot()
+  float spot = (1.0 - smoothstep(0.0, 0.16, d)) * step(0.82, h);  // ~18% of cells host a mote
+  float twinkle = 0.6 + 0.4 * sin(t * 2.0 + h * 6.2831853);       // stays positive
+  return spot * twinkle;
 }
 
 void main() {
@@ -127,9 +137,18 @@ void main() {
   if (uLamp.z > 0.0) {
     vec2 frag = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
     float d = distance(frag, uLamp.xy);
+    // innerFrac is INVERTED from LAMP_SOFTNESS: a bigger LAMP_SOFTNESS means a
+    // SMALLER saturated core (innerFrac closer to 0) and a wider falloff band
+    // out to uLamp.z, because it is the falloff band's inner edge, not its
+    // size. At the shipped 0.85 that is a 0.15R core / 0.85R band, matching
+    // the pre-tuning-block lamp.
     float innerFrac = clamp(1.0 - LAMP_SOFTNESS, 0.0, 0.95);
     float glow = 1.0 - smoothstep(uLamp.z * innerFrac, uLamp.z, d);
-    col += top * glow * 0.9 + vec3(0.03, 0.035, 0.045) * glow;
+    // 0.5, not 0.9 — 0.9 clamped green/blue to 1.0 across the whole core in
+    // brighter zones (e.g. Sunlit Shallows' top ~= (0.15, 0.75, 0.85)), which
+    // washed out the rays/caustics/motes already baked into col instead of
+    // lifting them.
+    col += top * glow * 0.5 + vec3(0.03, 0.035, 0.045) * glow;
   }
 
   outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
