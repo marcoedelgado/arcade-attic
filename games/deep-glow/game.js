@@ -32,6 +32,7 @@ const BEST_KEY = 'deep-glow:best';
 // any test — the suite only requires the id/kind/rare/x/y/phase shape.
 const CREATURE_SIZE = 34;          // base sprite edge in CSS px — rare gets a bit bigger below
 const CREATURE_RARE_BONUS = 8;     // px added to a rare creature's on-screen size
+const CREATURE_BUMPER_BONUS = 10;  // px added to a bumper's on-screen size — large at a glance
 const BUMP_RADIUS_M = 4.2;         // metres — a bumper is large, so its contact reach is generous
 const BUMP_COOLDOWN_SECONDS = 0.5; // after a bump, no further bump is scored for this long — a
                                     // lingering overlap costs fuel once, not every frame
@@ -287,7 +288,9 @@ if (!glx) {
         const sway = CREATURE_SWAY[c.kind] || CREATURE_SWAY.drifter;
         critter.x = centreX + (c.x + Math.sin(now / sway.period + c.phase) * sway.amp) * dpr;
         critter.y = height * DIVER_SCREEN_Y + (c.y - depthM) * PX_PER_METRE * dpr;
-        critter.size = (CREATURE_SIZE + (c.rare ? CREATURE_RARE_BONUS : 0)) * dpr;
+        critter.size = (CREATURE_SIZE
+          + (c.rare ? CREATURE_RARE_BONUS : 0)
+          + (c.kind === 'bumper' ? CREATURE_BUMPER_BONUS : 0)) * dpr;
         batch.push(critter);
       }
 

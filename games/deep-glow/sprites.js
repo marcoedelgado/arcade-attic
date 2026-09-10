@@ -24,19 +24,22 @@ const MASK_ZERO = 56; // fully transparent from here to the border (8px clear ma
 
 // Grid slots, in draw order. Row 0 is the diver + plankton + lamp glow from
 // earlier tasks; Task 9 appends one frame per creature id in depth.js's ZONES,
-// grouped by zone (5 zones x 3 creatures = 15 ids), row 1 onward.
+// grouped by zone (5 zones x 4 creatures = 20 ids), row 1 onward. The
+// round-1 fix added the fifth id per zone — the non-rare bumper — after the
+// first pass left every zone with no obstacle at all (every rare is a
+// drifter, and the original roster had no non-rare bumper to fall back on).
 const LAYOUT = [
   'diver', 'plankton-a', 'plankton-b', 'plankton-c', 'lamp-glow',
   // Sunlit Shallows
-  'bubble-fish', 'silver-dart', 'sunfish',
+  'bubble-fish', 'silver-dart', 'lazy-turtle', 'sunfish',
   // The Blue
-  'blue-dancer', 'phantom-squid', 'electric-eel',
+  'blue-dancer', 'phantom-squid', 'slow-manta', 'electric-eel',
   // The Twilight
-  'lantern-jelly', 'shadow-fish', 'anglerfish',
+  'lantern-jelly', 'shadow-fish', 'round-puffer', 'anglerfish',
   // The Midnight
-  'glowing-squid', 'depth-lurker', 'fangtooth',
+  'glowing-squid', 'depth-lurker', 'blob-fish', 'fangtooth',
   // The Trench
-  'vent-worm', 'black-smoker', 'giant-octopus',
+  'vent-worm', 'black-smoker', 'boulder-crab', 'giant-octopus',
 ];
 
 let built = null;
@@ -101,30 +104,40 @@ function drawCell(id) {
     drawBubbleFish(ctx, cx, cy);
   } else if (id === 'silver-dart') {
     drawSilverDart(ctx, cx, cy);
+  } else if (id === 'lazy-turtle') {
+    drawLazyTurtle(ctx, cx, cy);
   } else if (id === 'sunfish') {
     drawSunfish(ctx, cx, cy);
   } else if (id === 'blue-dancer') {
     drawBlueDancer(ctx, cx, cy);
   } else if (id === 'phantom-squid') {
     drawPhantomSquid(ctx, cx, cy);
+  } else if (id === 'slow-manta') {
+    drawSlowManta(ctx, cx, cy);
   } else if (id === 'electric-eel') {
     drawElectricEel(ctx, cx, cy);
   } else if (id === 'lantern-jelly') {
     drawLanternJelly(ctx, cx, cy);
   } else if (id === 'shadow-fish') {
     drawShadowFish(ctx, cx, cy);
+  } else if (id === 'round-puffer') {
+    drawRoundPuffer(ctx, cx, cy);
   } else if (id === 'anglerfish') {
     drawAnglerfish(ctx, cx, cy);
   } else if (id === 'glowing-squid') {
     drawGlowingSquid(ctx, cx, cy);
   } else if (id === 'depth-lurker') {
     drawDepthLurker(ctx, cx, cy);
+  } else if (id === 'blob-fish') {
+    drawBlobFish(ctx, cx, cy);
   } else if (id === 'fangtooth') {
     drawFangtooth(ctx, cx, cy);
   } else if (id === 'vent-worm') {
     drawVentWorm(ctx, cx, cy);
   } else if (id === 'black-smoker') {
     drawBlackSmoker(ctx, cx, cy);
+  } else if (id === 'boulder-crab') {
+    drawBoulderCrab(ctx, cx, cy);
   } else if (id === 'giant-octopus') {
     drawGiantOctopus(ctx, cx, cy);
   }
@@ -211,6 +224,11 @@ function drawSilverDart(ctx, cx, cy) {               // shy — sleek, no tail, 
   paintEllipse(ctx, cx, cy, 26, 7, [225, 240, 250], 1);
   drawBlob(ctx, cx + 20, cy, 4, [255, 255, 255]);
 }
+function drawLazyTurtle(ctx, cx, cy) {               // bumper — big soft shell, harmless "oops"
+  paintEllipse(ctx, cx, cy, 30, 22, [80, 170, 165], 0.6);   // shell dome, low peak so it reads soft
+  paintEllipse(ctx, cx + 26, cy + 4, 9, 6, [140, 220, 210], 0.5); // small head nub
+  drawBlob(ctx, cx - 4, cy - 4, 5, [200, 250, 235]);        // one dim shell highlight
+}
 function drawSunfish(ctx, cx, cy) {                  // rare — big warm disc
   drawBlob(ctx, cx, cy, 34, [255, 214, 120]);
   paintEllipse(ctx, cx, cy, 30, 22, [255, 236, 180], 0.6);
@@ -228,6 +246,10 @@ function drawPhantomSquid(ctx, cx, cy) {             // shy — pale, translucen
   drawBlob(ctx, cx, cy + 20, 5, [180, 210, 255]);
   drawBlob(ctx, cx + 10, cy + 16, 5, [180, 210, 255]);
 }
+function drawSlowManta(ctx, cx, cy) {                // bumper — wide flat glide, no urgency
+  paintEllipse(ctx, cx, cy, 32, 14, [40, 90, 175], 0.55);   // wide flat body
+  paintEllipse(ctx, cx - 26, cy, 8, 5, [50, 100, 190], 0.4); // small trailing tail nub
+}
 function drawElectricEel(ctx, cx, cy) {              // rare — long body, bright spark accents
   paintEllipse(ctx, cx, cy, 30, 7, [90, 170, 230], 0.9);
   drawBlob(ctx, cx - 10, cy, 4, [255, 255, 190]);
@@ -242,6 +264,11 @@ function drawLanternJelly(ctx, cx, cy) {
 function drawShadowFish(ctx, cx, cy) {               // shy — dim, easy to lose in the dark
   paintEllipse(ctx, cx - 16, cy, 8, 9, [50, 40, 100], 0.35);
   paintEllipse(ctx, cx, cy, 20, 11, [90, 75, 160], 0.5);
+}
+function drawRoundPuffer(ctx, cx, cy) {              // bumper — round and slow, puffed up
+  drawBlob(ctx, cx, cy, 28, [95, 75, 175]);
+  paintEllipse(ctx, cx, cy, 24, 22, [150, 130, 220], 0.45);
+  drawBlob(ctx, cx + 8, cy - 6, 3, [255, 250, 235]);        // one small eye-glint
 }
 function drawAnglerfish(ctx, cx, cy) {               // rare — dark body, one very bright lure
   paintEllipse(ctx, cx, cy, 24, 15, [60, 45, 90], 0.6);
@@ -258,6 +285,10 @@ function drawDepthLurker(ctx, cx, cy) {              // shy — barely there
   paintEllipse(ctx, cx, cy, 22, 10, [45, 30, 70], 0.3);
   drawBlob(ctx, cx + 14, cy, 3, [120, 150, 210]);
 }
+function drawBlobFish(ctx, cx, cy) {                 // bumper — droopy, soft, comically slow
+  paintEllipse(ctx, cx, cy, 28, 20, [70, 55, 110], 0.4);    // big droopy body, low peak
+  paintEllipse(ctx, cx + 14, cy + 10, 9, 6, [90, 70, 130], 0.35); // sagging nose
+}
 function drawFangtooth(ctx, cx, cy) {                // rare — dark body, bright teeth accent
   paintEllipse(ctx, cx, cy, 20, 13, [90, 20, 25], 0.6);
   drawBlob(ctx, cx + 8, cy + 3, 3, [255, 255, 255]);
@@ -272,6 +303,11 @@ function drawVentWorm(ctx, cx, cy) {                 // vertical tube, bright pl
 function drawBlackSmoker(ctx, cx, cy) {              // shy — smoky, low-alpha, one vent glow
   paintEllipse(ctx, cx, cy, 22, 18, [60, 25, 15], 0.35);
   drawBlob(ctx, cx, cy - 6, 8, [255, 130, 50]);
+}
+function drawBoulderCrab(ctx, cx, cy) {              // bumper — bulky, low, two stubby claws
+  paintEllipse(ctx, cx, cy, 30, 18, [140, 60, 25], 0.55);   // bulky rounded shell
+  drawBlob(ctx, cx - 22, cy - 2, 6, [180, 90, 40]);         // stubby claw
+  drawBlob(ctx, cx + 22, cy - 2, 6, [180, 90, 40]);         // stubby claw
 }
 function drawGiantOctopus(ctx, cx, cy) {             // rare — big warm body, four limb accents
   drawBlob(ctx, cx, cy, 30, [230, 90, 40]);

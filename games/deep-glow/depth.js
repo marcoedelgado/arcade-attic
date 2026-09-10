@@ -12,7 +12,10 @@ const LOOP_START_ZONE = 2;
 // 0→1), where "next" respects the loop: zones 0–1 proceed normally, but zone 4 connects
 // back to zone 2.
 // `cast` lists creature encounters (id: frame id & sightings key, kind: spawn type,
-// rare: singleton per zone, always drifter to avoid punishing the reward).
+// rare: singleton per zone, always drifter to avoid punishing the reward). Each
+// zone carries four entries: one ambient drifter, one shy (flees the lamp), one
+// non-rare bumper (the zone's obstacle — costs lamp fuel on contact), and one
+// rare drifter (the costless reward). All 20 ids are unique across zones.
 export const ZONES = [
   {
     id: 'sunlit-shallows',
@@ -21,6 +24,7 @@ export const ZONES = [
     cast: [
       { id: 'bubble-fish', kind: 'drifter', rare: false },
       { id: 'silver-dart', kind: 'shy', rare: false },
+      { id: 'lazy-turtle', kind: 'bumper', rare: false },
       { id: 'sunfish', kind: 'drifter', rare: true },
     ],
   },
@@ -31,6 +35,7 @@ export const ZONES = [
     cast: [
       { id: 'blue-dancer', kind: 'drifter', rare: false },
       { id: 'phantom-squid', kind: 'shy', rare: false },
+      { id: 'slow-manta', kind: 'bumper', rare: false },
       { id: 'electric-eel', kind: 'drifter', rare: true },
     ],
   },
@@ -41,6 +46,7 @@ export const ZONES = [
     cast: [
       { id: 'lantern-jelly', kind: 'drifter', rare: false },
       { id: 'shadow-fish', kind: 'shy', rare: false },
+      { id: 'round-puffer', kind: 'bumper', rare: false },
       { id: 'anglerfish', kind: 'drifter', rare: true },
     ],
   },
@@ -51,6 +57,7 @@ export const ZONES = [
     cast: [
       { id: 'glowing-squid', kind: 'drifter', rare: false },
       { id: 'depth-lurker', kind: 'shy', rare: false },
+      { id: 'blob-fish', kind: 'bumper', rare: false },
       { id: 'fangtooth', kind: 'drifter', rare: true },
     ],
   },
@@ -61,6 +68,7 @@ export const ZONES = [
     cast: [
       { id: 'vent-worm', kind: 'drifter', rare: false },
       { id: 'black-smoker', kind: 'shy', rare: false },
+      { id: 'boulder-crab', kind: 'bumper', rare: false },
       { id: 'giant-octopus', kind: 'drifter', rare: true },
     ],
   },
