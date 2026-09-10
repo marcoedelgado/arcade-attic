@@ -129,5 +129,19 @@ export function makeField({ rng }) {
       metresUntilNextCreature = CREATURE_EVERY_METRES;
       spawnedRareIds.clear();
     },
+
+    // Force-set the field's internal depth tracker, bypassing step()'s
+    // dtMetres-only accumulation. Why this exists: the field never sees the
+    // diver's absolute depth, only the (clamped-at-zero) metres descended
+    // each frame — so it has no way to notice when the diver's REAL depth
+    // moves by something other than that clamped delta, which is exactly
+    // what a brownout's rescue-rise does. Without a resync, the field
+    // silently drifts ahead of the diver by the full rise on every brownout,
+    // permanently and cumulatively. The spawn/cull debt counters
+    // (metresUntilNext*) are deliberately left untouched — only WHERE new
+    // actors appear should jump, not the rate they arrive at.
+    resync(metres) {
+      depthM = metres;
+    },
   };
 }

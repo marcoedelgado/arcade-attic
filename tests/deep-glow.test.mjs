@@ -204,6 +204,22 @@ test('field: reset empties everything', () => {
   assert.equal(f.creatures.length, 0);
 });
 
+test('field: resync repoints future spawns to the resynced depth, not the pre-resync one', () => {
+  // Pins the brownout-desync bug: game.js clamps `descended` to 0 while the
+  // diver's real depth RISES during a brownout, so field.step() alone never
+  // learns the diver moved. Without an explicit resync(), the field's own
+  // depthM stays stranded at its pre-brownout value forever, and every
+  // subsequent spawn is placed that far too deep.
+  const f = makeField({ rng: seeded(13) });
+  f.step(300, ctx(BOX));   // descend 300 m — the field's own depthM tracks this
+  f.resync(20);            // simulate the brownout rescue: diver's real depth is now only 20 m
+  f.step(50, ctx(BOX));    // enough metres (spawn gap is 14 m) to guarantee a fresh spawn
+  const spawned = f.plankton[f.plankton.length - 1];
+  const expectedY = 20 + 50 + 60;   // resynced depth + this step's descent + viewMetres (ctx's 60)
+  assert.equal(spawned.y, expectedY,
+    `spawned at y=${spawned.y}, expected ${expectedY} — resync() did not repoint the field's depth`);
+});
+
 test('lamp: drains monotonically without pickups', () => {
   const l = makeLamp();
   let prev = Infinity;

@@ -26,6 +26,13 @@ const PLANKTON_SIZE = 22;      // mote sprite edge in CSS px
 const PLANKTON_DRIFT = 6;      // CSS px of lazy horizontal sway, keyed off each mote's phase
 
 const PICKUP_RADIUS_M = 3.4;   // metres — the diver's catch reach for plankton
+                                // catch difficulty is viewport-width dependent: this radius is
+                                // fixed in metres, but diver.box() (and so the diver's steerable
+                                // span) scales with screen width, so a narrow phone plays
+                                // measurably easier than a wide desktop window (~18% vs ~8% of
+                                // motes fall within reach by chance). Intentional — the phone is
+                                // the target device and should be the forgiving one — but a trap
+                                // for whoever retunes either number later without the other.
 const GLOW_SCALE = 2.4;        // lamp sprite edge as a multiple of the lamp's pixel radius
 const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
@@ -491,6 +498,13 @@ if (!glx) {
           lampSnap.radius = lamp.radius;
           lampSnap.brownout = false;
           state = STATE.DIVING;                  // play resumes — no game-over
+          // The field's own depthM only ever moves by the clamped-at-zero
+          // `descended` below, so the diver's real rise during the drift
+          // (BROWNOUT_RISE_M) left it stranded that far ahead. Resync it to
+          // the diver's real depth here, once, or every plankton/creature
+          // spawns permanently too deep from this point on — see field.js's
+          // resync() for the full story.
+          field.resync(depthM);
           applyKeys();                           // a key still physically held
                                                  // must take effect now, not on
                                                  // the next press
