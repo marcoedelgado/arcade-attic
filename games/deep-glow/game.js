@@ -8,7 +8,7 @@ import { makeGl, fail } from './gl.js';
 import { makeMedium } from './medium.js';
 import { buildAtlas } from './sprites.js';
 import { makeBatch } from './batch.js';
-import { paletteAt, castAt, escalationAt } from './depth.js';
+import { paletteAt, castAt, escalationAt, ZONES } from './depth.js';
 import { makeLoop } from './loop.js';
 import { makeDiver } from './diver.js';
 import { makeField } from './field.js';
@@ -17,6 +17,7 @@ import { takePlankton, bumped, sighted } from './collect.js';
 import { makeSightings } from './sightings.js';
 import { makeAudio } from './audio.js';
 import { makeTilt, tiltPreferred } from './tilt.js';
+import { makeHud } from './hud.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 64;         // sprite edge in CSS px (scaled by DPR at draw time)
@@ -57,6 +58,15 @@ const CREATURE_SWAY = {
 // the loop already branches on `state` so that is an addition, not a rewrite.
 const STATE = { MENU: 'menu', DIVING: 'diving', BROWNOUT: 'brownout' };
 
+// prefers-reduced-motion: read once at boot (same convention as asteroid-run) —
+// this is a system preference, not something that flips mid-session. CALM
+// scales the medium's own clock (see calmClock below) and damps the bump
+// wobble; nothing about calm ever touches gameplay, so the game stays fully
+// playable either way.
+const reducedMotion =
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const CALM = reducedMotion ? 0.25 : 1.0;
+
 // localStorage throws on ACCESS (not just writes) in private-mode Safari, so
 // every read and every write is wrapped.
 function readBest() {
@@ -83,12 +93,18 @@ if (!glx) {
   if (!medium || !batch) {
     glx.fail('Deep Glow could not start its water shader — check the console.');
   } else {
-    const cssViewport = () => {
-      const rect = canvas.getBoundingClientRect();
-      return { width: Math.max(1, rect.width), height: Math.max(1, rect.height) };
-    };
+    // Viewport dims (fix: layout thrash). ONE getBoundingClientRect() read here
+    // seeds everything; from here on out it's only re-read on the 'resize'
+    // event, on 'scroll' (position can change without a size change), and on a
+    // DPR change (watchDpr(), wired below) — never every frame, and never per
+    // pointer event. cssVp is CSS px (diver/field/tilt all want this); viewport
+    // is device px + dpr (what render() feeds the GL viewport/uniforms);
+    // canvasRect is the raw rect, cached for pointerPos.
+    let canvasRect = canvas.getBoundingClientRect();
+    let cssVp = { width: Math.max(1, canvasRect.width), height: Math.max(1, canvasRect.height) };
+    let viewport = glx.resize(canvasRect);   // sizes the canvas + gl.viewport once, from the rect above
 
-    const diver = makeDiver({ viewport: cssViewport(), restFraction: DIVER_SCREEN_Y });
+    const diver = makeDiver({ viewport: cssVp, restFraction: DIVER_SCREEN_Y });
     const field = makeField({ rng: Math.random });   // pure; the rng is defaulted here, at the call site
     const lamp = makeLamp();
     const loop = makeLoop();
@@ -98,6 +114,7 @@ if (!glx) {
     const captionEl = document.getElementById('dg-caption');
     const audio = makeAudio();
     const muteBtn = document.getElementById('dg-mute');
+    const hud = makeHud(document.querySelector('.dg-stage-wrap'));
 
     function syncMuteBtn() {
       if (!muteBtn) return;
@@ -122,9 +139,69 @@ if (!glx) {
     }
 
     let depthM = 0;
-    let state = STATE.DIVING;   // Task 13: start at STATE.MENU instead
+    let state = STATE.MENU;
     let brownoutT = 0;          // seconds elapsed in the current brownout drift
     let best = readBest();
+
+    // creature id -> a human caption/label ("giant-octopus" -> "Giant Octopus").
+    // Every id sighted() ever returns, and every id in RARE_IDS below, is a rare
+    // id from depth.js's ZONES — already lowercase-hyphenated words, so no
+    // lookup table is needed. Used by both the caption (during a dive) and the
+    // menu badges (before one).
+    function creatureName(id) {
+      return id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    /* ---------- menu (Task 13): the real starting state ---------- */
+    const menuEl = document.getElementById('dg-menu');
+    const menuBestEl = document.getElementById('dg-menu-best');
+    const badgesEl = document.getElementById('dg-badges');
+    const startBtn = document.getElementById('dg-start');
+
+    if (menuBestEl) {
+      if (best > 0) {
+        menuBestEl.textContent = `Best dive: ${Math.floor(best)} m`;
+        menuBestEl.hidden = false;
+      } else {
+        menuBestEl.hidden = true;
+      }
+    }
+
+    // One badge per zone's rare creature (depth.js: exactly one per zone, in
+    // zone order) — lit if sightings has ever marked it, a dim silhouette
+    // otherwise. Built once; sightings only grows during a dive and there is
+    // no path back to the menu this task, so there is nothing to re-sync.
+    const RARE_IDS = ZONES.map((z) => z.cast.find((c) => c.rare).id);
+    if (badgesEl) {
+      for (const id of RARE_IDS) {
+        const b = document.createElement('span');
+        b.className = 'dg-badge';
+        b.setAttribute('role', 'listitem');
+        b.textContent = '🐠';
+        const seen = sightings.has(id);
+        b.classList.toggle('lit', seen);
+        const label = seen ? creatureName(id) : 'Not yet spotted';
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        badgesEl.appendChild(b);
+      }
+    }
+
+    // Menu -> diving is deferred by one requestAnimationFrame, same fix as
+    // pocket-pairs commit 5cb0131: a big synchronous DOM change (hiding the
+    // menu, showing the HUD) inside the tap's own handler is intermittently
+    // read by iOS as a swipe-back gesture and bounces the page home.
+    function beginDive() {
+      if (state !== STATE.MENU) return;
+      audio.unlock();   // the tap itself is the user gesture that may build the context
+      requestAnimationFrame(() => {
+        if (menuEl) menuEl.hidden = true;
+        hud.show();
+        audio.resetMelody();   // each dive opens the pentatonic scale from its root note
+        state = STATE.DIVING;
+      });
+    }
+    if (startBtn) startBtn.addEventListener('click', beginDive);
 
     // Bump wobble and sighting caption both run on a simple decaying timer,
     // ticked once per frame regardless of state so they always finish fading.
@@ -132,6 +209,16 @@ if (!glx) {
     let bumpCooldownT = 0;      // seconds remaining before another bump can score
     let captionT = 0;           // seconds remaining the current caption is shown
     let captionId = null;       // creature id the caption is currently naming
+
+    // The medium's own shared clock (medium.js: `t = uTime * uCalm`). Fed by
+    // dt * CALM every frame regardless of state, rather than a raw wall clock
+    // multiplied by calm at draw time — the latter is what makes a changed
+    // calm mid-run rewrite every phase in the shader at once (a whole-screen
+    // jump); accumulating instead means calm only ever changes the clock's
+    // RATE, never its value, so there is nothing to pop. Always fed a
+    // non-negative term (CALM is 0.25 or 1.0) — the shader casts a value
+    // derived from this to uvec2, and uvec2() of a negative is UB.
+    let calmClock = 0;
 
     // One lamp snapshot per frame — fuel, light radius, and the one-frame
     // brownout latch. Seeded so render() has real numbers before the first tick.
@@ -170,13 +257,6 @@ if (!glx) {
     // consult kind ("a bump is a bump"), so the caller decides who can bump —
     // that's here, not in collect.js.
     const bumperScratch = [];
-
-    // creature id -> a human caption ("giant-octopus" -> "Giant Octopus"). Every
-    // id sighted() ever returns is a rare id from depth.js's ZONES, and their ids
-    // are already lowercase-hyphenated words — no lookup table needed.
-    function creatureName(id) {
-      return id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    }
 
     function showCaption(id) {
       captionId = id;
@@ -255,15 +335,20 @@ if (!glx) {
     const resolution = [1, 1];
 
     function render() {
-      const { width, height, dpr } = glx.resize();
+      // Cached, not re-measured: viewport is only ever refreshed by the
+      // resize/scroll/DPR-change handlers below, never here — this used to be
+      // a forced layout (glx.resize() -> getBoundingClientRect()) on every
+      // single frame.
+      const { width, height, dpr } = viewport;
       const pal = paletteAt(depthM);
 
       // A bumper contact shakes the whole scene for WOBBLE_SECONDS, decaying
       // linearly to nothing. centreX replaces width/2 everywhere below (diver,
       // plankton, creatures, lamp glow) so every actor shakes together, not just
-      // the diver sprite.
+      // the diver sprite. Amplitude is damped by CALM under reduced motion —
+      // still readable as "something happened", just gentler.
       const shakeK = wobbleT > 0 ? wobbleT / WOBBLE_SECONDS : 0;
-      const shakePx = shakeK > 0 ? Math.sin(performance.now() / 35) * WOBBLE_PX * shakeK : 0;
+      const shakePx = shakeK > 0 ? Math.sin(performance.now() / 35) * WOBBLE_PX * shakeK * CALM : 0;
       const centreX = width / 2 + shakePx * dpr;
 
       // Diver + lamp in device pixels (top-left origin), shared by the medium
@@ -279,14 +364,14 @@ if (!glx) {
       resolution[1] = height;
 
       medium.draw({
-        time: performance.now() / 1000,
+        time: calmClock,          // pre-scaled by CALM already (see calmClock's decl) — never pops
         depth: depthM,
         zoneA: pal.a,
         zoneB: pal.b,
         zoneMix: pal.mix,
         lamp: lampUniform,       // never undefined — a real object every frame
         resolution,
-        calm: 1,
+        calm: 1,                  // scaling already baked into calmClock; left at 1 so t = uTime * uCalm is a no-op
       });
 
       // World -> screen: x is centre-relative CSS px, so the device-pixel screen x
@@ -342,6 +427,10 @@ if (!glx) {
       batch.begin(width, height);
       batch.push(glow);
       batch.flush();
+
+      // Cheap even while hidden (menu state): hud.update() only writes when a
+      // rounded value actually changed.
+      hud.update({ depthM, fuel: lampSnap.fuel, best });
     }
 
     loop.start((dt) => {
@@ -358,7 +447,11 @@ if (!glx) {
         }
       }
 
-      if (state === STATE.MENU) { render(); return; }   // Task 13 fills this in
+      // The medium keeps drifting behind the menu too — ticked unconditionally,
+      // same as the timers above. CALM is never negative, so neither is this.
+      calmClock += dt * CALM;
+
+      if (state === STATE.MENU) { render(); return; }
 
       const prevDepthM = depthM;
       const escalation = escalationAt(depthM);
@@ -409,7 +502,7 @@ if (!glx) {
       // Clamped at 0 so the upward rescue drift neither spawns nor mis-culls.
       const descended = Math.max(0, depthM - prevDepthM);
       fieldCtx.box = diver.box();                                  // only x0/x1 are used
-      fieldCtx.viewMetres = cssViewport().height / PX_PER_METRE;   // one screen-height of depth
+      fieldCtx.viewMetres = cssVp.height / PX_PER_METRE;           // one screen-height of depth
       fieldCtx.cast = castAt(depthM);
       fieldCtx.escalation = escalation;
       field.step(descended, fieldCtx);
@@ -431,7 +524,7 @@ if (!glx) {
         if (inputLocked()) return;
         diver.aim(sx, sy);
       },
-      getViewport: cssViewport,
+      getViewport: () => cssVp,   // cached object, no layout read — deviceorientation can fire fast
     });
     const tiltBtn = document.getElementById('dg-tilt');
     const tiltMsgEl = document.getElementById('dg-tilt-msg');
@@ -486,8 +579,9 @@ if (!glx) {
     }
 
     function pointerPos(e) {
-      const rect = canvas.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      // Cached rect — was a getBoundingClientRect() on every single
+      // pointermove, forcing layout on every move event of every drag.
+      return { x: e.clientX - canvasRect.left, y: e.clientY - canvasRect.top };
     }
     canvas.addEventListener('pointerdown', (e) => {
       audio.unlock();   // any gesture may need to pull a Safari-suspended context back to 'running'
@@ -527,10 +621,39 @@ if (!glx) {
       applyKeys();
     });
 
-    window.addEventListener('resize', () => {
-      diver.setViewport(cssViewport());
-      render();
-    });
+    // Re-measure on 'resize' only (asteroid-run's own convention) — one
+    // getBoundingClientRect() feeds cssVp, viewport (via glx.resize) and
+    // canvasRect all at once. No render() call here: the loop above renders
+    // every frame regardless of state, so the very next rAF (≤ ~16ms away)
+    // already picks up the new dims — calling render() here too was a
+    // redundant second draw on every resize.
+    function measure() {
+      canvasRect = canvas.getBoundingClientRect();
+      cssVp = { width: Math.max(1, canvasRect.width), height: Math.max(1, canvasRect.height) };
+      viewport = glx.resize(canvasRect);
+      diver.setViewport(cssVp);
+    }
+    window.addEventListener('resize', measure);
+
+    // A resize handler alone misses two cases: the canvas's on-screen
+    // POSITION (not size) changing under scroll — which is all pointerPos's
+    // cached canvasRect actually needs — and the device pixel ratio changing
+    // without any 'resize' firing at all (dragging the window to a monitor
+    // with a different DPR). 'scroll' covers the first cheaply; the
+    // self-reattaching matchMedia listener below covers the second.
+    window.addEventListener('scroll', () => {
+      canvasRect = canvas.getBoundingClientRect();
+    }, { passive: true });
+
+    if (typeof matchMedia === 'function') {
+      let dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      const onDprChange = () => {
+        measure();
+        dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+        dprQuery.addEventListener('change', onDprChange, { once: true });
+      };
+      dprQuery.addEventListener('change', onDprChange, { once: true });
+    }
 
     // Persist the best depth when the page goes away mid-dive — a brownout is the
     // normal checkpoint, but a kid closing the tab shouldn't lose their record.

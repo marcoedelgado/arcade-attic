@@ -279,6 +279,10 @@ export function makeAudio() {
     thud,
     brownout,
     setMuted,
+    // Called once per new dive (game.js's Start button) so the pentatonic
+    // scale always opens from its root note instead of continuing wherever
+    // the previous dive's pickups left it.
+    resetMelody() { pingStep = 0; },
     get muted() { return muted; },
     // Not part of the task's nominal interface, but game.js needs a way to
     // disable the mute button instead of letting a click throw when

@@ -127,9 +127,11 @@ export function makeGl(canvas) {
   }
 
   // Size the drawing buffer to the CSS box times the DPR, capped at 2 — a 3x
-  // phone at full res tanks the framerate for no visible gain.
-  function resize() {
-    const rect = canvas.getBoundingClientRect();
+  // phone at full res tanks the framerate for no visible gain. Accepts an
+  // already-measured rect (game.js caches one on resize/scroll) so a caller
+  // driving this from a resize handler never forces a second layout read here.
+  function resize(rect) {
+    rect = rect || canvas.getBoundingClientRect();
     const dpr = Math.min(devicePixelRatio || 1, 2);
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));

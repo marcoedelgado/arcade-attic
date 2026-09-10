@@ -35,13 +35,16 @@ export function makeSightings({ storage }) {
 
 // readAll — best-effort load from storage. Any throw (missing storage, a
 // private-mode SecurityError on GET, malformed JSON) is swallowed and treated
-// as "nothing saved yet".
+// as "nothing saved yet". A corrupt or tampered value (e.g. `[42, null]`) can
+// still pass Array.isArray — every element is filtered down to strings too,
+// since the menu badges (the first consumer of all()/has()) index straight
+// off these ids.
 function readAll(storage) {
   try {
     const raw = storage.getItem(KEY);
     if (raw == null) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
   } catch {
     return [];
   }

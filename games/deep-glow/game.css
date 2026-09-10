@@ -84,6 +84,116 @@ body { overscroll-behavior: contain; }
   pointer-events: none;
 }
 
+/* Menu — the real starting state (Task 13). A full-cover scrim over the
+   live canvas so the water shows through while the title/badges/Start stay
+   legible. Its own z-index (1) sits above the canvas but below the mute/tilt
+   corner buttons (2), so those stay reachable while the menu is up. The
+   [hidden] guard is needed because the flex display below would otherwise
+   out-rank the UA stylesheet's `[hidden] { display: none }` — same pattern
+   as pocket-pairs' start/play screens. */
+.dg-menu {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 16px;
+  text-align: center;
+  background: rgba(6, 12, 24, 0.4);
+}
+.dg-menu[hidden] { display: none; }
+
+.dg-menu-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 6vw, 26px);
+  color: var(--neon);
+  text-shadow: 0 0 12px rgba(255, 211, 77, 0.45), 3px 3px 0 var(--attic-deep);
+}
+.dg-menu-best {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+.dg-menu-start {
+  font-size: 1.1rem;
+  padding: 14px 34px;
+}
+
+/* Sighting badges — lit (a creature the player has actually met) vs a dim
+   silhouette (not yet). Same glyph either way; only the filter/opacity
+   differ, so nothing about an unseen creature is spoiled beyond "you'll
+   know it when you see it". */
+.dg-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 300px;
+}
+.dg-badge {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  font-size: 18px;
+  filter: grayscale(1) brightness(0.45);
+  opacity: 0.55;
+}
+.dg-badge.lit {
+  filter: none;
+  opacity: 1;
+  border-color: var(--neon);
+  box-shadow: 0 0 8px rgba(255, 211, 77, 0.5);
+}
+
+/* In-dive HUD — depth, lamp fuel, best. DOM text over the canvas (crisper,
+   no font atlas). Same [hidden] guard reasoning as .dg-menu above. Pointer
+   events pass through to the canvas underneath — the HUD never blocks the
+   drag that steers it. */
+.dg-hud {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--font-display);
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--attic-deep);
+}
+.dg-hud[hidden] { display: none; }
+.dg-hud-depth {
+  font-size: 0.85rem;
+}
+.dg-hud-meter {
+  width: 130px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(6, 12, 24, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.dg-hud-meter-fill {
+  height: 100%;
+  width: var(--fuel-pct, 100%);
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon));
+}
+.dg-hud-best {
+  font-size: 0.6rem;
+  color: var(--ink-dim);
+}
+
 .dg-fallback {
   position: absolute;
   inset: 0;

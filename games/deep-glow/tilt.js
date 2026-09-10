@@ -128,7 +128,10 @@ export function makeTilt({ onAim, getViewport }) {
 
             function onFirst(e) {
               if (settled) return;
-              if (e.gamma == null && e.beta == null) return;   // keep waiting for a real one
+              // Both axes must be present, matching apply()'s own bail condition
+              // below — calibrating off a reading with one axis null would read
+              // the toggle as ON forever after while apply() bails every frame.
+              if (e.gamma == null || e.beta == null) return;   // keep waiting for a real one
               settled = true;
               clearTimeout(timer);
               window.removeEventListener('deviceorientation', onFirst);
