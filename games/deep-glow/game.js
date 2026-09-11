@@ -8,7 +8,7 @@ import { makeGl, fail } from './gl.js';
 import { makeMedium } from './medium.js';
 import { buildAtlas } from './sprites.js';
 import { makeBatch } from './batch.js';
-import { paletteAt, castAt, escalationAt, ZONES } from './depth.js';
+import { paletteAt, castAt, escalationAt, waterAt, ZONES } from './depth.js';
 import { makeLoop } from './loop.js';
 import { makeDiver } from './diver.js';
 import { makeField } from './field.js';
@@ -222,7 +222,7 @@ if (!glx) {
     let captionT = 0;           // seconds remaining the current caption is shown
     let captionId = null;       // creature id the caption is currently naming
 
-    // The medium's own shared clock (medium.js: `t = uTime * uCalm`). Fed by
+    // The medium's own shared clock (medium.js: `t = uTime`). Fed by
     // dt * CALM every frame regardless of state, rather than a raw wall clock
     // multiplied by calm at draw time — the latter is what makes a changed
     // calm mid-run rewrite every phase in the shader at once (a whole-screen
@@ -230,7 +230,15 @@ if (!glx) {
     // RATE, never its value, so there is nothing to pop. Always fed a
     // non-negative term (CALM is 0.25 or 1.0) — the shader casts a value
     // derived from this to uvec2, and uvec2() of a negative is UB.
+    //
+    // Its RATE is CALM x water.calm: each zone moves at its own speed (the
+    // Midnight is the stillest water in the game, the Trench churns), and
+    // because only the rate changes, crossing a zone never pops the water.
     let calmClock = 0;
+
+    // The blended water recipe for the current depth, refreshed once per frame
+    // at the top of the loop and reused (waterAt fills it in place).
+    const water = waterAt(0, {});
 
     // One lamp snapshot per frame — fuel, light radius, and the one-frame
     // brownout latch. Seeded so render() has real numbers before the first tick.
@@ -376,14 +384,14 @@ if (!glx) {
       resolution[1] = height;
 
       medium.draw({
-        time: calmClock,          // pre-scaled by CALM already (see calmClock's decl) — never pops
-        depth: depthM,
+        time: calmClock,          // rate-scaled already (see calmClock's decl) — never pops
         zoneA: pal.a,
         zoneB: pal.b,
         zoneMix: pal.mix,
         lamp: lampUniform,       // never undefined — a real object every frame
         resolution,
-        calm: 1,                  // scaling already baked into calmClock; left at 1 so t = uTime * uCalm is a no-op
+        water,
+        hush: 0,
       });
 
       // World -> screen: x is centre-relative CSS px, so the device-pixel screen x
@@ -461,7 +469,8 @@ if (!glx) {
 
       // The medium keeps drifting behind the menu too — ticked unconditionally,
       // same as the timers above. CALM is never negative, so neither is this.
-      calmClock += dt * CALM;
+      waterAt(depthM, water);
+      calmClock += dt * CALM * water.calm;
 
       if (state === STATE.MENU) { render(); return; }
 

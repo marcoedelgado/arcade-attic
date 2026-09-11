@@ -1,14 +1,23 @@
 // medium.js — the water itself, drawn as one fullscreen shader pass. makeMedium
-// takes the object from makeGl and returns draw(opts). The fragment shader is
-// built in five layers, cheapest first: the murk gradient (the floor — if
-// everything else were switched off the game must still read as deep water),
-// god-rays, caustics, motes, then the lamp interaction on top. draw()'s
-// signature — { time, depth, zoneA, zoneB, zoneMix, lamp, calm } — has been the
-// full set since Task 1, so this task only changes the GLSL string and adds no
-// new uniforms: uTime, uDepth and uCalm were already being set unconditionally
-// by draw() below, just previously undeclared (and therefore silently
-// no-op'd) in the shader. All seven tuning constants that shape the mood live
-// in one block at the top of the fragment source.
+// takes the object from makeGl and returns draw(opts).
+//
+// The layer RECIPE is not decided here. depth.js owns a per-zone table of layer
+// strengths (ZONES[].water) and blends it with the same hold-then-handover as
+// the palette (waterAt); draw() uploads the blended values as uWater[] and the
+// shader just multiplies. That split is deliberate: the Claude Design export
+// this was built from computed zone weights in GLSL, duplicating depth.js's
+// zone/loop logic where no test can reach it. The uniform ORDER is depth.js's
+// WATER_KEYS, and the W_* #defines below are generated from it.
+//
+// Clock: t = uTime, full stop. game.js accumulates uTime at a varying RATE
+// (reduced motion x the zone's calm x the brownout). Multiplying uTime by a
+// changing factor here instead rewrites every phase on screen at once — a
+// whole-screen jump. uHush is separate and ONLY closes the vignette.
+//
+// Everything that is not per-zone sits in the TUNING block: shader work cannot
+// be unit-tested, so every number likely to need a playtest nudge lives there.
+
+import { WATER_KEYS } from './depth.js';
 
 const VERT_SRC = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -19,6 +28,10 @@ void main() {
   gl_Position = vec4(aPos, 0.0, 1.0);
 }
 `;
+
+const WATER_DEFINES = WATER_KEYS
+  .map((k, i) => `#define W_${k.toUpperCase()} uWater[${i}]`)
+  .join('\n');
 
 const FRAG_SRC = `#version 300 es
 precision highp float;
@@ -34,31 +47,37 @@ uniform vec3 uZoneB;
 uniform float uZoneMix;
 uniform vec3 uLamp;        // x, y (device px, top-left origin), radius (device px)
 uniform vec2 uResolution;  // drawing-buffer size in device px
-uniform float uTime;       // seconds
-uniform float uDepth;      // metres
-uniform float uCalm;       // 0..1; every motion term below is scaled by this
+uniform float uTime;       // seconds of game.js's rate-scaled clock
+uniform float uHush;       // 0..1, brownout only — closes the vignette
+uniform float uWater[${WATER_KEYS.length}];
 out vec4 outColor;
 
+${WATER_DEFINES}
+
 // ---- TUNING ----
-const float RAY_STRENGTH    = 0.30;   // sunlight shafts — surface only, there is no sun in the deep
-const float RAY_FADE_DEPTH  = 400.0;
-const float CAUSTIC_SCALE   = 5.0;
-const float CAUSTIC_FADE    = 260.0;  // caustics weaken past here but never vanish
-const float CAUSTIC_FLOOR   = 0.30;   // how much shimmer survives in the deep
-const float DEEP_FADE_START = 150.0;  // the deep-water layers fade IN across this
-const float DEEP_FADE_END   = 900.0;  //   range, as the sunlit ones fade OUT
-const float HAZE_STRENGTH   = 0.16;   // slow drifting murk bands, deep only
-const float GLIMMER_STRENGTH = 0.55;  // distant bioluminescence, deep only
-const float SNOW_DENSITY    = 26.0;   // marine-snow grid (the near layer's scale)
-const float SNOW_DRIFT      = 0.045;
-const float LAMP_SOFTNESS   = 0.72;
-const float LAMP_LIFT       = 0.55;   // how much the lamp REVEALS what's already there
-const float LAMP_ON_SNOW    = 2.2;    // how much brighter flakes are inside the beam
+const float SHAFT_STRENGTH   = 0.26;
+const float CAUSTIC_SCALE    = 5.0;
+const float CAUSTIC_STRENGTH = 0.60;
+const float CURTAIN_STRENGTH = 0.26;
+const float SNOW_DENSITY     = 26.0;   // marine-snow grid (the mid layer is x1.3 of this)
+const float SNOW_STRENGTH    = 0.40;
+const float GLIMMER_STRENGTH = 0.55;
+const float EMBER_STRENGTH   = 1.45;
+const float SHIMMER_AMOUNT   = 0.012;
+const float LAMP_SOFTNESS    = 0.72;
+const float LAMP_LIFT        = 0.55;
+const float LAMP_ON_SNOW     = 2.2;
+const vec3  SUN   = vec3(1.00, 0.97, 0.84);
+const vec3  SILT  = vec3(0.55, 0.62, 0.72);
+const vec3  EMBER = vec3(1.00, 0.33, 0.09);
+const vec3  GLIM  = vec3(0.45, 0.85, 0.95);
+const vec3  FLAKE = vec3(0.82, 0.90, 1.00);
+const float SKIP  = 0.001;   // a layer weighted below this is not computed at all
 // ---- END TUNING ----
 
 // A well-conditioned integer-ish hash: two big odd uint multiplies and an XOR,
 // no sin()-based huge-multiplier hashing (that loses precision on mobile
-// GPUs). Every call site below builds p from vUv (0..1) plus a non-negative
+// GPUs). Every call site below builds p from uv (0..1) plus a non-negative
 // time term, so p is always >= 0 and the float->uint cast is always
 // well-defined (never converting a negative float to unsigned).
 float hash21(vec2 p) {
@@ -79,38 +98,34 @@ float valueNoise(vec2 p) {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-// Layer 2 — god-rays: three angled sin bands summed and soft-clipped into
-// shafts. A cheap fake, not a volumetric march.
-float rayShafts(vec2 uv, float t) {
-  float a = sin((uv.x * 3.1 + uv.y * 1.6) * 6.2831853 + t * 0.55);
+// God-rays: three angled sin bands, soft-clipped, weaker toward the floor.
+// A cheap fake, not a volumetric march.
+float shafts(vec2 uv, float t) {
+  float a = sin((uv.x *  3.1 + uv.y * 1.6) * 6.2831853 + t * 0.55);
   float b = sin((uv.x * -2.3 + uv.y * 1.1) * 6.2831853 + t * 0.35 + 1.9);
-  float c = sin((uv.x * 4.4 + uv.y * 1.9) * 6.2831853 + t * 0.22 + 3.4);
-  float bands = (a + b + c) / 3.0;       // in [-1, 1]
-  return smoothstep(0.25, 0.95, bands);  // soft shafts, always in [0, 1]
+  float c = sin((uv.x *  4.4 + uv.y * 1.9) * 6.2831853 + t * 0.22 + 3.4);
+  return smoothstep(0.25, 0.95, (a + b + c) / 3.0) * (1.0 - uv.y * 0.55);
 }
 
-// Layer 3 — caustics: two octaves of the value noise above, offset in both
-// space and (non-negative) time so they don't visibly lock together.
+// Caustics: two octaves of value noise, offset in both space and
+// (non-negative) time so they don't visibly lock together.
 float caustics(vec2 uv, float t) {
   vec2 p = uv * CAUSTIC_SCALE;
-  float n1 = valueNoise(p + vec2(t * 0.6, t * 0.4));
-  float n2 = valueNoise(p * 2.07 + vec2(t * 0.35, t * 0.9) + 17.0);
-  return n1 * 0.65 + n2 * 0.35;  // in [0, 1]
+  return valueNoise(p + vec2(t * 0.6, t * 0.4)) * 0.65
+       + valueNoise(p * 2.07 + vec2(t * 0.35, t * 0.9) + 17.0) * 0.35;
 }
 
-// Layer 3b — deep haze: very low-frequency noise bands drifting slowly upward.
-// This is what REPLACES the god-rays once there is no sun left to cast them,
-// so the deep still has structure moving through it instead of flat murk.
-float deepHaze(vec2 uv, float aspect, float t) {
-  vec2 p = vec2(uv.x * aspect * 0.9, uv.y * 1.7 + t * 0.02);
-  float n = valueNoise(p + vec2(t * 0.05, 0.0)) * 0.65
-          + valueNoise(p * 2.3 + vec2(31.0, t * 0.08)) * 0.35;
-  return smoothstep(0.45, 0.95, n);
+// Silt curtains: wide, low-frequency sheets drifting sideways as well as up,
+// so the deep has structure CROSSING the frame instead of only falling
+// through it. This is what makes The Twilight dusty.
+float curtains(vec2 uv, float aspect, float t) {
+  vec2 p = vec2(uv.x * aspect * 1.15 + t * 0.035, uv.y * 0.55 + t * 0.02);
+  float n = valueNoise(p * 2.0) * 0.6 + valueNoise(p * 5.3 + 31.0) * 0.4;
+  return smoothstep(0.44, 0.92, n) * (0.35 + 0.65 * smoothstep(0.0, 0.6, uv.y));
 }
 
-// Layer 3c — glimmers: sparse bioluminescent points far off in the murk.
-// Bigger, dimmer and slower than marine snow, and they breathe rather than
-// twinkle, so they read as distant living things rather than dust.
+// Far glimmers: sparse, breathing, NOT twinkling — distant living things, dim
+// enough that the lamp outshines them until the brownout takes it away.
 float glimmers(vec2 uv, float aspect, float t) {
   vec2 p = vec2(uv.x * aspect, uv.y + t * 0.012) * 7.0;
   vec2 cell = floor(p);
@@ -122,8 +137,8 @@ float glimmers(vec2 uv, float aspect, float t) {
   return spot * step(0.90, h) * breathe;
 }
 
-// Layer 4 — marine snow. Scrolling vUv.y by +t reads as flakes drifting UP the
-// screen: the diver sinks faster than the field does, so relative to the diver
+// Marine snow. Scrolling uv.y by +t reads as flakes drifting UP the screen:
+// the diver sinks faster than the field does, so relative to the diver
 // everything streams past upward.
 //
 // Three of these are summed at different scales and speeds. That parallax is
@@ -148,44 +163,52 @@ float snowLayer(vec2 uv, float aspect, float t, float density, float drift, floa
 }
 
 void main() {
-  float t = uTime * uCalm;  // one shared clock — every motion term reads this
-
-  // ---- layer 1: murk gradient ----
-  vec3 top = mix(uZoneA, uZoneB, uZoneMix);
-  vec3 col = mix(top, top * 0.25, vUv.y);
-
-  // ---- layer 2: god-rays, gone by RAY_FADE_DEPTH ----
-  float rayFade = 1.0 - smoothstep(0.0, RAY_FADE_DEPTH, uDepth);
-  col += vec3(1.0, 0.97, 0.85) * rayShafts(vUv, t) * RAY_STRENGTH * rayFade;
-
-  // ---- layer 3: caustics. Strong at the surface, but floored at
-  // CAUSTIC_FLOOR rather than fading to nothing — the old version reached zero
-  // at 260m (7.6 seconds in) and never came back, which is a large part of why
-  // the deep looked so empty. ----
-  float causticFade = mix(CAUSTIC_FLOOR, 1.0, 1.0 - smoothstep(0.0, CAUSTIC_FADE, uDepth));
-  float causticMod = clamp(1.0 + (caustics(vUv, t) - 0.5) * 0.7 * causticFade, 0.0, 2.0);
-  col *= causticMod;
-
+  float t = uTime;
   float aspect = uResolution.x / max(uResolution.y, 1.0);
 
-  // ---- layers 3b/3c: the deep-water pair, fading IN as the sunlit ones fade
-  // OUT. Every original layer faded out with depth, so past ~400m the water
-  // held only a gradient, dots and the lamp — three ingredients, forever. These
-  // two keep roughly three layers alive at EVERY depth instead. ----
-  float deep = smoothstep(DEEP_FADE_START, DEEP_FADE_END, uDepth);
-  col += top * deepHaze(vUv, aspect, t) * HAZE_STRENGTH * deep;
-  col += vec3(0.45, 0.85, 0.95) * glimmers(vUv, aspect, t) * GLIMMER_STRENGTH * deep;
+  // Heat shimmer bends the SAMPLING uv, so ember light, snow and curtains all
+  // wobble together above the vents. Clamped straight back into [0,1]: every
+  // hash above casts to uvec2, and uvec2() of a negative float is undefined.
+  // The export this came from let the left edge go slightly negative.
+  vec2 uv = vUv;
+  if (W_SHIMMER > SKIP) {
+    uv.x = clamp(uv.x + sin(uv.y * 34.0 - t * 1.6) * SHIMMER_AMOUNT * W_SHIMMER * vUv.y * vUv.y, 0.0, 1.0);
+  }
 
-  // ---- layer 5a: the lamp's falloff, computed BEFORE the snow so that flakes
-  // inside the beam can catch the light. A lamp underwater is legible mostly
-  // because of what drifts through it, not because of the glow itself. ----
+  // ---- layer 1: murk gradient. W_FLOOR > 1 inverts it: the Trench is lit from below. ----
+  vec3 top = mix(uZoneA, uZoneB, uZoneMix);
+  vec3 col = mix(top, top * W_FLOOR, uv.y);
+
+  // ---- layer 2: ceiling — the last of the daylight, up there ----
+  col += mix(top, SUN, 0.35) * pow(1.0 - uv.y, 3.0) * 0.32 * W_CEILING;
+
+  // ---- layer 3: god-rays ----
+  if (W_SHAFTS > SKIP) col += SUN * shafts(uv, t) * SHAFT_STRENGTH * W_SHAFTS;
+
+  // ---- layer 4: caustics, as a multiply so it modulates what is already there ----
+  col *= clamp(1.0 + (caustics(uv, t) - 0.5) * CAUSTIC_STRENGTH * W_CAUSTICS, 0.0, 2.0);
+
+  // ---- layer 5: silt curtains ----
+  if (W_CURTAINS > SKIP) col += mix(top, SILT, 0.25) * curtains(uv, aspect, t) * CURTAIN_STRENGTH * W_CURTAINS;
+
+  // ---- layer 6: far glimmers ----
+  if (W_GLIMMERS > SKIP) col += GLIM * glimmers(uv, aspect, t) * GLIMMER_STRENGTH * W_GLIMMERS;
+
+  // ---- layer 7: ember floor and slow updraft vents ----
+  if (W_EMBER > SKIP) {
+    float band = pow(uv.y, 3.2) * (0.62 + 0.38 * sin(t * 0.6 + uv.x * 5.0));
+    float vents = smoothstep(0.55, 1.0, valueNoise(vec2(uv.x * 3.0, t * 0.08)));
+    col += EMBER * (band + vents * pow(uv.y, 5.0) * 0.9) * EMBER_STRENGTH * W_EMBER;
+  }
+
+  // ---- layer 8: the lamp's falloff, computed BEFORE the snow so that flakes
+  // inside the beam can catch the light. ----
   float glow = 0.0;
   if (uLamp.z > 0.0) {
     vec2 frag = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
     float d = distance(frag, uLamp.xy);
     // innerFrac is INVERTED from LAMP_SOFTNESS: a bigger LAMP_SOFTNESS means a
-    // SMALLER saturated core and a wider falloff band out to uLamp.z, because
-    // it is the band's inner edge, not its size.
+    // SMALLER saturated core and a wider falloff band out to uLamp.z.
     float innerFrac = clamp(1.0 - LAMP_SOFTNESS, 0.0, 0.95);
     glow = 1.0 - smoothstep(uLamp.z * innerFrac, uLamp.z, d);
     glow = glow * glow;   // squared: tighter core, much longer soft tail
@@ -193,17 +216,19 @@ void main() {
   // Reveal the water that is already there rather than painting white over it.
   col *= 1.0 + glow * LAMP_LIFT;
 
-  // ---- layer 4: marine snow, three parallax layers, at every depth. Brighter
-  // inside the beam — this is the cue that actually reads as "a lamp in water". ----
+  // ---- layer 9: marine snow, three parallax layers, brighter in the beam ----
   float snow =
-      snowLayer(vUv, aspect, t, SNOW_DENSITY * 2.1, SNOW_DRIFT * 0.35, 0.09, vec2(0.0, 0.0))   * 0.35
-    + snowLayer(vUv, aspect, t, SNOW_DENSITY * 1.3, SNOW_DRIFT * 0.70, 0.13, vec2(37.0, 91.0)) * 0.60
-    + snowLayer(vUv, aspect, t, SNOW_DENSITY * 0.7, SNOW_DRIFT * 1.35, 0.20, vec2(83.0, 11.0)) * 1.00;
-  col += vec3(0.82, 0.90, 1.0) * snow * 0.42 * (1.0 + glow * LAMP_ON_SNOW);
+      snowLayer(uv, aspect, t, SNOW_DENSITY * 2.1, 0.016, 0.09, vec2(0.0, 0.0))   * W_SNOWFAR
+    + snowLayer(uv, aspect, t, SNOW_DENSITY * 1.3, 0.032, 0.13, vec2(37.0, 91.0)) * W_SNOWMID
+    + snowLayer(uv, aspect, t, SNOW_DENSITY * 0.7, 0.061, 0.20, vec2(83.0, 11.0)) * W_SNOWNEAR;
+  col += FLAKE * snow * SNOW_STRENGTH * (1.0 + glow * LAMP_ON_SNOW);
 
   // A modest cool add so the beam still exists in near-black water, where there
   // is nothing for the multiply above to reveal.
   col += (top * 0.35 + vec3(0.04, 0.09, 0.11)) * glow;
+
+  // ---- brownout vignette: the dark closing in ----
+  col *= 1.0 - 0.80 * uHush * smoothstep(0.12, 0.85, length((vUv - 0.5) * vec2(aspect, 1.0)));
 
   outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
@@ -217,41 +242,45 @@ export function makeMedium(glx) {
 
   const quad = fullscreenQuad();
 
-  // Cache every uniform location once. Every uniform draw() sets is now
-  // actually declared in the shader above; the null-is-a-no-op pattern stays
-  // in place for whichever future task adds an optional one.
+  // Cache every uniform location once.
   const u = {
     time: gl.getUniformLocation(prog, 'uTime'),
-    depth: gl.getUniformLocation(prog, 'uDepth'),
     zoneA: gl.getUniformLocation(prog, 'uZoneA'),
     zoneB: gl.getUniformLocation(prog, 'uZoneB'),
     zoneMix: gl.getUniformLocation(prog, 'uZoneMix'),
     lamp: gl.getUniformLocation(prog, 'uLamp'),
     resolution: gl.getUniformLocation(prog, 'uResolution'),
-    calm: gl.getUniformLocation(prog, 'uCalm'),
+    hush: gl.getUniformLocation(prog, 'uHush'),
+    water: gl.getUniformLocation(prog, 'uWater'),
   };
+
+  // Reused every frame — the water object is flattened into this in WATER_KEYS order.
+  const waterBuf = new Float32Array(WATER_KEYS.length);
 
   function draw({
     time = 0,
-    depth = 0,
     zoneA,
     zoneB,
     zoneMix = 0,
     lamp = null,
     resolution = null,
-    calm = 0,
+    water = null,
+    hush = 0,
   } = {}) {
     gl.useProgram(prog);
     gl.bindVertexArray(quad);
 
     gl.uniform1f(u.time, time);
-    gl.uniform1f(u.depth, depth);
     if (zoneA) gl.uniform3fv(u.zoneA, zoneA);
     if (zoneB) gl.uniform3fv(u.zoneB, zoneB);
     gl.uniform1f(u.zoneMix, zoneMix);
     if (lamp) gl.uniform3f(u.lamp, lamp.x, lamp.y, lamp.radius);
     if (resolution) gl.uniform2f(u.resolution, resolution[0], resolution[1]);
-    gl.uniform1f(u.calm, calm);
+    gl.uniform1f(u.hush, hush);
+    if (water) {
+      for (let i = 0; i < WATER_KEYS.length; i++) waterBuf[i] = water[WATER_KEYS[i]];
+      gl.uniform1fv(u.water, waterBuf);
+    }
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
