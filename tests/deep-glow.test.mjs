@@ -7,6 +7,7 @@ import { makeLamp } from '../games/deep-glow/lamp.js';
 import { takePlankton, bumped, sighted } from '../games/deep-glow/collect.js';
 import { makeSightings } from '../games/deep-glow/sightings.js';
 import { litAt, ambientFor, LAMP_ON_SPRITE, LAMP_REACH, BUMPER_FLOOR } from '../games/deep-glow/light.js';
+import { CREATURES, DIVER_OPS, F, MASK_ZERO, opsAt, extent, frameId } from '../games/deep-glow/creatures.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -419,5 +420,59 @@ test('light: bumpers never drop below the floor, and the floor never dims a brig
 test('depth: every zone has an ambient light level in (0, 1]', () => {
   for (const z of ZONES) {
     assert.ok(z.water.ambient > 0 && z.water.ambient <= 1, `${z.name} ambient ${z.water.ambient}`);
+  }
+});
+
+test('creatures: twenty, unique ids, four per zone with one of each role', () => {
+  assert.equal(CREATURES.length, 20);
+  assert.equal(new Set(CREATURES.map((c) => c.id)).size, 20);
+  for (let z = 0; z < 5; z++) {
+    const cast = CREATURES.filter((c) => c.zone === z);
+    assert.equal(cast.length, 4, `zone ${z}`);
+    assert.deepEqual(cast.map((c) => (c.rare ? 'rare' : c.kind)).sort(), ['bumper', 'drifter', 'rare', 'shy']);
+  }
+});
+
+test('creatures: every shape in every frame stays inside the clear disc', () => {
+  // The additive rule: a sprite whose light reaches its cell border draws a
+  // bright square on screen. sprites.js masks to MASK_ZERO regardless — this
+  // makes sure no art is silently CUT OFF by that mask.
+  for (const { id, ops } of [...CREATURES, { id: 'diver', ops: DIVER_OPS }]) {
+    for (let f = 0; f < F; f++) {
+      for (const o of opsAt(ops, f)) {
+        assert.ok(extent(o) < MASK_ZERO, `${id} frame ${f}: ${JSON.stringify(o)} reaches ${extent(o)}`);
+        assert.ok(o.a >= 0 && o.a <= 1, `${id} frame ${f}: alpha ${o.a}`);
+        for (const r of o.k === 'b' ? [o.r] : [o.rx, o.ry]) assert.ok(r > 0, `${id} frame ${f}: radius ${r}`);
+      }
+    }
+  }
+});
+
+test('creatures: opsAt animates base + amp·sin(2π(f/F + ph)) and never mutates its input', () => {
+  const ops = [{ k: 'b', x: 0, y: 10, r: 4, c: '#ffffff', a: 1, an: { p: 'y', amp: 3, ph: 0.25 } }];
+  for (let f = 0; f < F; f++) {
+    const want = 10 + 3 * Math.sin(2 * Math.PI * (f / F + 0.25));
+    assert.ok(Math.abs(opsAt(ops, f)[0].y - want) < 1e-9, `frame ${f}`);
+    assert.equal(opsAt(ops, f)[0].an, undefined);
+  }
+  assert.equal(ops[0].y, 10);
+  assert.ok(ops[0].an, 'input op lost its animation');
+});
+
+test('creatures: animated alpha is clamped to [0, 1]', () => {
+  const ops = [{ k: 'b', x: 0, y: 0, r: 4, c: '#ffffff', a: 0.9, an: { p: 'a', amp: 0.5 } }];
+  const alphas = [0, 1, 2].map((f) => opsAt(ops, f)[0].a);
+  assert.ok(alphas.every((a) => a >= 0 && a <= 1), String(alphas));
+  assert.ok(alphas.includes(1), 'the overshoot should clamp to exactly 1');
+});
+
+test('creatures: frame ids are "<id>/<frame>"', () => {
+  assert.equal(frameId('sunwheel', 2), 'sunwheel/2');
+});
+
+test('creatures: depth.js casts match the creature table exactly', () => {
+  for (let z = 0; z < ZONES.length; z++) {
+    const want = CREATURES.filter((c) => c.zone === z).map(({ id, kind, rare }) => ({ id, kind, rare }));
+    assert.deepEqual(ZONES[z].cast, want, `zone ${z} (${ZONES[z].name})`);
   }
 });

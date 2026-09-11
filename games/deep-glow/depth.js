@@ -16,6 +16,9 @@ const LOOP_START_ZONE = 2;
 // zone carries four entries: one ambient drifter, one shy (flees the lamp), one
 // non-rare bumper (the zone's obstacle — costs lamp fuel on contact), and one
 // rare drifter (the costless reward). All 20 ids are unique across zones.
+// Ids are the Claude Design names (2026-09-11). They double as sighting keys,
+// so the rename reset every badge — deliberately: the owner chose that over
+// migration code. creatures.js holds the art; a test pins the two lists together.
 //
 // `water` is the zone's layer recipe for medium.js, straight from the Claude
 // Design art direction (§02): each key is a 0–1 strength (floor can exceed 1 —
@@ -35,10 +38,10 @@ export const ZONES = [
       snowFar: 0.40, snowMid: 0.55, snowNear: 0.45, glimmers: 0.00, ember: 0.00, shimmer: 0.00,
       lift: 0.25, emit: 0.30, calm: 1.00, ambient: 1.00 },
     cast: [
-      { id: 'bubble-fish', kind: 'drifter', rare: false },
-      { id: 'silver-dart', kind: 'shy', rare: false },
-      { id: 'lazy-turtle', kind: 'bumper', rare: false },
-      { id: 'sunfish', kind: 'drifter', rare: true },
+      { id: 'bubblefish', kind: 'drifter', rare: false },
+      { id: 'glint', kind: 'shy', rare: false },
+      { id: 'old-turtle', kind: 'bumper', rare: false },
+      { id: 'sunwheel', kind: 'drifter', rare: true },
     ],
   },
   {
@@ -50,10 +53,10 @@ export const ZONES = [
       snowFar: 0.55, snowMid: 0.70, snowNear: 0.60, glimmers: 0.18, ember: 0.00, shimmer: 0.00,
       lift: 0.45, emit: 0.50, calm: 0.70, ambient: 0.60 },
     cast: [
-      { id: 'blue-dancer', kind: 'drifter', rare: false },
-      { id: 'phantom-squid', kind: 'shy', rare: false },
-      { id: 'slow-manta', kind: 'bumper', rare: false },
-      { id: 'electric-eel', kind: 'drifter', rare: true },
+      { id: 'kitefish', kind: 'drifter', rare: false },
+      { id: 'ghost-squid', kind: 'shy', rare: false },
+      { id: 'big-manta', kind: 'bumper', rare: false },
+      { id: 'sparkeel', kind: 'drifter', rare: true },
     ],
   },
   {
@@ -66,9 +69,9 @@ export const ZONES = [
       lift: 0.75, emit: 0.80, calm: 0.55, ambient: 0.35 },
     cast: [
       { id: 'lantern-jelly', kind: 'drifter', rare: false },
-      { id: 'shadow-fish', kind: 'shy', rare: false },
-      { id: 'round-puffer', kind: 'bumper', rare: false },
-      { id: 'anglerfish', kind: 'drifter', rare: true },
+      { id: 'shy-shadow', kind: 'shy', rare: false },
+      { id: 'puffball', kind: 'bumper', rare: false },
+      { id: 'star-jelly', kind: 'drifter', rare: true },
     ],
   },
   {
@@ -80,10 +83,10 @@ export const ZONES = [
       snowFar: 0.70, snowMid: 0.95, snowNear: 0.90, glimmers: 1.00, ember: 0.12, shimmer: 0.08,
       lift: 1.00, emit: 1.00, calm: 0.40, ambient: 0.20 },
     cast: [
-      { id: 'glowing-squid', kind: 'drifter', rare: false },
-      { id: 'depth-lurker', kind: 'shy', rare: false },
-      { id: 'blob-fish', kind: 'bumper', rare: false },
-      { id: 'fangtooth', kind: 'drifter', rare: true },
+      { id: 'bead-squid', kind: 'drifter', rare: false },
+      { id: 'lurker', kind: 'shy', rare: false },
+      { id: 'sleeper', kind: 'bumper', rare: false },
+      { id: 'big-lantern', kind: 'drifter', rare: true },
     ],
   },
   {
@@ -98,9 +101,9 @@ export const ZONES = [
       lift: 0.85, emit: 0.90, calm: 0.85, ambient: 0.30 },
     cast: [
       { id: 'vent-worm', kind: 'drifter', rare: false },
-      { id: 'black-smoker', kind: 'shy', rare: false },
+      { id: 'ashcloud', kind: 'shy', rare: false },
       { id: 'boulder-crab', kind: 'bumper', rare: false },
-      { id: 'giant-octopus', kind: 'drifter', rare: true },
+      { id: 'ember-octopus', kind: 'drifter', rare: true },
     ],
   },
 ];
