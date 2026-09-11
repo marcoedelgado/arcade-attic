@@ -19,6 +19,8 @@
 // `supported` is false and callers (game.js) use it to disable the mute button
 // instead of letting any of this throw.
 
+import { BEATS, BROWNOUT_SECONDS } from './brownout.js';
+
 const MUTED_KEY = 'deep-glow:muted';
 
 // A5-rooted major pentatonic. ping() steps through it on consecutive pickups so
@@ -42,8 +44,11 @@ const THUD_DURATION_S = 0.22;      // short noise burst
 const THUD_GAIN = 0.3;
 const THUD_CUTOFF_HZ = 380;        // muffled, not harsh
 
-const BROWNOUT_DIVE_S = 0.6;       // pitch/filter close time
-const BROWNOUT_RECOVER_S = 1.4;    // reopen time as the lamp relights
+// Timed to brownout.js's beats, not free-standing: the drone closes across the
+// gutter and hush, holds through the lift, and reopens with the relight.
+const BROWNOUT_DIVE_S = BEATS.hushEnd;                          // 1.6
+const BROWNOUT_RECOVER_AT_S = BEATS.liftEnd;                    // 3.1
+const BROWNOUT_RECOVER_S = BROWNOUT_SECONDS - BEATS.liftEnd;    // 1.1
 
 function hasWebAudio() {
   return typeof window !== 'undefined' &&
@@ -236,9 +241,9 @@ export function makeAudio() {
     osc2.frequency.setTargetAtTime(DRONE_BASE_FREQ * 0.5, now, BROWNOUT_DIVE_S / 3);
     droneFilter.frequency.setTargetAtTime(CUTOFF_TRENCH_HZ * 0.4, now, BROWNOUT_DIVE_S / 3);
 
-    // Recover: reopen back to the surface brightness, timed to land after the
-    // dive settles — echoes the lamp's own relight.
-    const recoverAt = now + BROWNOUT_DIVE_S;
+    // Recover: reopen back to the surface brightness exactly as the lamp
+    // relights (brownout.js's relight beat) — the sound is the light returning.
+    const recoverAt = now + BROWNOUT_RECOVER_AT_S;
     osc1.frequency.setTargetAtTime(DRONE_BASE_FREQ, recoverAt, BROWNOUT_RECOVER_S / 3);
     osc2.frequency.setTargetAtTime(DRONE_BASE_FREQ, recoverAt, BROWNOUT_RECOVER_S / 3);
     droneFilter.frequency.setTargetAtTime(CUTOFF_SURFACE_HZ, recoverAt, BROWNOUT_RECOVER_S / 3);

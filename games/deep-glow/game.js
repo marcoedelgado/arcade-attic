@@ -20,6 +20,7 @@ import { makeTilt, tiltPreferred } from './tilt.js';
 import { makeHud } from './hud.js';
 import { litAt, ambientFor } from './light.js';
 import { CREATURES, F, frameId } from './creatures.js';
+import { brownoutAt, BROWNOUT_SECONDS } from './brownout.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 84;         // sprite edge in CSS px (scaled by DPR at draw time).
@@ -40,7 +41,6 @@ const PICKUP_RADIUS_M = 3.4;   // metres — the diver's catch reach for plankto
                                 // motes fall within reach by chance). Intentional — the phone is
                                 // the target device and should be the forgiving one — but a trap
                                 // for whoever retunes either number later without the other.
-const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
 const BEST_KEY = 'deep-glow:best';
 const TILT_MSG_SECONDS = 3;    // how long the "tilt isn't available" toast stays up
@@ -163,6 +163,9 @@ if (!glx) {
     let depthM = 0;
     let state = STATE.MENU;
     let brownoutT = 0;          // seconds elapsed in the current brownout drift
+    let brownoutFromM = 0;      // depth the rescue started at — the rise is measured from here
+    let brownoutFromR = 0;      // lamp radius (CSS px) at the moment it went out
+    let brownoutCalm = 1;       // brownout.js calm: slows the water's clock AND closes the vignette
     let best = readBest();
 
     // creature id -> a human caption/label ("ember-octopus" -> "Ember Octopus").
@@ -241,9 +244,10 @@ if (!glx) {
     // non-negative term (CALM is 0.25 or 1.0) — the shader casts a value
     // derived from this to uvec2, and uvec2() of a negative is UB.
     //
-    // Its RATE is CALM x water.calm: each zone moves at its own speed (the
-    // Midnight is the stillest water in the game, the Trench churns), and
-    // because only the rate changes, crossing a zone never pops the water.
+    // Its RATE is CALM x water.calm x brownoutCalm: each zone moves at its own
+    // speed (the Midnight is the stillest water in the game, the Trench
+    // churns), and the brownout's hush slows everything almost to a stop.
+    // Because only the rate changes, none of it ever pops the water.
     let calmClock = 0;
 
     // The blended water recipe for the current depth, refreshed once per frame
@@ -400,7 +404,7 @@ if (!glx) {
         lamp: lampUniform,       // never undefined — a real object every frame
         resolution,
         water,
-        hush: 0,
+        hush: 1 - brownoutCalm,  // the vignette closes as the brownout hushes the water
         fuel: lampSnap.fuel,     // its own uniform: the shader can't derive it from a device-px radius
       });
 
@@ -478,7 +482,7 @@ if (!glx) {
       // The medium keeps drifting behind the menu too — ticked unconditionally,
       // same as the timers above. CALM is never negative, so neither is this.
       waterAt(depthM, water);
-      calmClock += dt * CALM * water.calm;
+      calmClock += dt * CALM * water.calm * brownoutCalm;
 
       if (state === STATE.MENU) { render(); return; }
 
@@ -504,17 +508,25 @@ if (!glx) {
         if (s.brownout) {
           state = STATE.BROWNOUT;
           brownoutT = 0;
-          audio.brownout();                      // dip-and-recover in one scheduled call
+          brownoutFromM = depthM;
+          brownoutFromR = lampSnap.radius;
+          audio.brownout();                      // dip-and-recover, timed to brownout.js's beats
           writeBest(best);                       // checkpoint the run
         }
       } else if (state === STATE.BROWNOUT) {
-        // Input is ignored (inputLocked). The diver drifts up toward the light;
-        // the lamp is NOT ticked, so its fuel stays at 0 and lampSnap.radius
-        // holds at the floor — the screen stays near-black through the drift.
+        // Input is ignored (inputLocked). The lamp itself is NOT ticked — its
+        // fuel stays at 0 — but what the player SEES is brownout.js's
+        // timeline: the gutter, the hush down to a coal, the lift, the warm
+        // relight. Depth is set from the timeline's rise rather than
+        // integrated, so the 50 m is exact however the frames fall.
         brownoutT += dt;
-        const rise = BROWNOUT_RISE_M * (dt / BROWNOUT_SECONDS);
-        depthM = diver.nudge(-rise).y;
+        const b = brownoutAt(brownoutT, brownoutFromR);
+        depthM = diver.nudge(brownoutFromM - BROWNOUT_RISE_M * b.rise - depthM).y;
+        lampSnap.radius = b.radius;
+        lampSnap.fuel = b.fuel;
+        brownoutCalm = b.calm;
         if (brownoutT >= BROWNOUT_SECONDS) {
+          brownoutCalm = 1;
           lamp.relight();                        // clears the latch, fuel -> 0.5
           lampSnap.fuel = lamp.fuel;
           lampSnap.radius = lamp.radius;
