@@ -60,19 +60,26 @@ const WOBBLE_SECONDS = 0.28;       // how long the screen shake from a bump last
 const WOBBLE_PX = 5;               // CSS px of screen-shake amplitude at the start of a wobble
 const SHY_FLEE_PX_PER_S = 150;     // how fast a shy creature darts once the lamp reaches it
 const CAPTION_SECONDS = 2.5;       // how long a sighting caption stays on screen
-// Per-kind cosmetic sway at render time — same idea as PLANKTON_DRIFT, applied
-// to creatures instead. Amplitude in CSS px, period in ms. Purely visual: it
-// never touches the creature's real x, which is what bump/sighted compare.
 // Every animated frame id ("<id>/<f>"), built once — the render loop must
 // not build strings.
 const FRAME_IDS = {};
 for (const { id } of [{ id: 'diver' }, ...CREATURES]) {
   FRAME_IDS[id] = Array.from({ length: F }, (_, f) => frameId(id, f));
 }
-const CREATURE_SWAY = {
-  drifter: { amp: 10, period: 2600 },
-  shy: { amp: 4, period: 900 },
-  bumper: { amp: 3, period: 3400 },
+
+// Per-kind cosmetic motion at render time: a side-to-side sway, an up-and-down
+// bob a quarter-cycle behind it (so each creature traces a lazy loop), and a
+// tilt that follows the bob (nose dips on the way down). Purely visual — it
+// never touches c.x / c.y, which is what bump/sighted compare — so the offsets
+// stay small: much past ~15px a child would see an Old Turtle touch the fish
+// without a bump. The tilt moves nothing, so it is the cheap way to add life.
+// period is in seconds for one full loop. (The old sway was sin(ms / period)
+// with no 2π, so its "2.6s" loop actually took ~16s — nearly still.)
+const CREATURE_MOTION = {
+  drifter: { swayPx: 12, bobPx: 5, period: 3.4, tilt: 0.14 },
+  shy: { swayPx: 5, bobPx: 3, period: 1.2, tilt: 0.22 },     // quick and nervous
+  bumper: { swayPx: 6, bobPx: 4, period: 5.0, tilt: 0.07 },  // slow and heavy
+  rare: { swayPx: 10, bobPx: 9, period: 4.0, tilt: 0.10 },   // an unhurried loop
 };
 
 // State machine: menu -> diving -> brownout -> diving. Task 13 adds the real
@@ -519,17 +526,21 @@ if (!glx) {
         batch.push(mote);
       }
 
-      // Creatures: same world->screen projection as plankton, with a per-kind
-      // cosmetic sway (CREATURE_SWAY) standing in for PLANKTON_DRIFT. This sway
-      // never touches c.x itself — a fleeing 'shy' creature's real x already
-      // moved in updateCreatureInteractions(); this is purely the on-screen wobble
-      // layered on top, same as plankton's.
+      // Creatures: same world->screen projection as plankton, plus per-kind
+      // cosmetic motion (CREATURE_MOTION). It never touches c.x / c.y — a
+      // fleeing 'shy' creature's real x already moved in
+      // updateCreatureInteractions(); this is purely the on-screen wobble
+      // layered on top, same as plankton's drift. CALM slows it under reduced
+      // motion, exactly as it slows the water.
+      const swimT = (now / 1000) * CALM;
       for (const c of field.creatures) {
         // Offset by the creature's own phase so a screenful doesn't flap in lockstep.
         critter.id = FRAME_IDS[c.id][(tick + Math.floor(c.phase * 10)) % F];
-        const sway = CREATURE_SWAY[c.kind] || CREATURE_SWAY.drifter;
-        critter.x = centreX + (c.x + Math.sin(now / sway.period + c.phase) * sway.amp) * dpr;
-        critter.y = height * DIVER_SCREEN_Y + (c.y - depthM) * PX_PER_METRE * dpr;
+        const m = c.rare ? CREATURE_MOTION.rare : (CREATURE_MOTION[c.kind] || CREATURE_MOTION.drifter);
+        const ph = swimT * (Math.PI * 2 / m.period) + c.phase;
+        critter.x = centreX + (c.x + Math.sin(ph) * m.swayPx) * dpr;
+        critter.y = height * DIVER_SCREEN_Y + ((c.y - depthM) * PX_PER_METRE + Math.cos(ph) * m.bobPx) * dpr;
+        critter.rot = -Math.sin(ph) * m.tilt;   // follows the bob's direction: nose down on the way down
         critter.size = (CREATURE_SIZE
           + (c.rare ? CREATURE_RARE_BONUS : 0)
           + (c.kind === 'bumper' ? CREATURE_BUMPER_BONUS : 0)) * dpr;
