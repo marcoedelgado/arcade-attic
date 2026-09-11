@@ -14,6 +14,8 @@
 // changing factor here instead rewrites every phase on screen at once — a
 // whole-screen jump. uHush is separate and ONLY closes the vignette.
 //
+// The lamp is shader-only; there is no glow sprite any more.
+//
 // Everything that is not per-zone sits in the TUNING block: shader work cannot
 // be unit-tested, so every number likely to need a playtest nudge lives there.
 
@@ -49,6 +51,7 @@ uniform vec3 uLamp;        // x, y (device px, top-left origin), radius (device 
 uniform vec2 uResolution;  // drawing-buffer size in device px
 uniform float uTime;       // seconds of game.js's rate-scaled clock
 uniform float uHush;       // 0..1, brownout only — closes the vignette
+uniform float uFuel;       // 0..1 — passed directly: uLamp.z is DEVICE px, so fuel can't be derived from it
 uniform float uWater[${WATER_KEYS.length}];
 out vec4 outColor;
 
@@ -64,9 +67,11 @@ const float SNOW_STRENGTH    = 0.40;
 const float GLIMMER_STRENGTH = 0.55;
 const float EMBER_STRENGTH   = 1.45;
 const float SHIMMER_AMOUNT   = 0.012;
-const float LAMP_SOFTNESS    = 0.72;
-const float LAMP_LIFT        = 0.55;
-const float LAMP_ON_SNOW     = 2.2;
+const float LAMP_LIFT        = 0.85;   // how much the lamp REVEALS water already there (x W_LIFT)
+const float LAMP_ON_SNOW     = 2.6;    // how much brighter flakes are inside the beam
+const vec3  LAMP_FULL  = vec3(1.00, 0.86, 0.62);   // warm white, full tank
+const vec3  LAMP_EMPTY = vec3(1.00, 0.55, 0.22);   // ember, empty
+const vec3  SPILL      = vec3(0.30, 0.72, 0.86);   // cool edge
 const vec3  SUN   = vec3(1.00, 0.97, 0.84);
 const vec3  SILT  = vec3(0.55, 0.62, 0.72);
 const vec3  EMBER = vec3(1.00, 0.33, 0.09);
@@ -201,31 +206,41 @@ void main() {
     col += EMBER * (band + vents * pow(uv.y, 5.0) * 0.9) * EMBER_STRENGTH * W_EMBER;
   }
 
-  // ---- layer 8: the lamp's falloff, computed BEFORE the snow so that flakes
-  // inside the beam can catch the light. ----
-  float glow = 0.0;
+  // ---- layer 8: the lamp. Warm in the middle, cool at the edge, stronger
+  // BELOW the fish (you always sink), and it changes as it burns down: the
+  // core slides to ember and a nervous tremor comes in (sin(t * 11.3) is
+  // 11.3 rad/s = 1.8 Hz — well clear of the photosensitive band). Computed
+  // before the snow so flakes inside the beam catch it. ----
+  float lit = 0.0, core = 0.0, spill = 0.0, dirB = 1.0, br = 1.0;
   if (uLamp.z > 0.0) {
     vec2 frag = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
-    float d = distance(frag, uLamp.xy);
-    // innerFrac is INVERTED from LAMP_SOFTNESS: a bigger LAMP_SOFTNESS means a
-    // SMALLER saturated core and a wider falloff band out to uLamp.z.
-    float innerFrac = clamp(1.0 - LAMP_SOFTNESS, 0.0, 0.95);
-    glow = 1.0 - smoothstep(uLamp.z * innerFrac, uLamp.z, d);
-    glow = glow * glow;   // squared: tighter core, much longer soft tail
+    vec2 p = frag - uLamp.xy;
+    float d = length(p);
+    float r = uLamp.z;
+    float axis = dot(normalize(p + 1e-4), vec2(0.0, 1.0));
+    dirB = mix(0.62, 1.0, smoothstep(-0.35, 0.85, axis));
+    br = 1.0 + 0.030 * sin(t * 2.7) + 0.075 * (1.0 - uFuel) * sin(t * 11.3);
+    core = 1.0 - smoothstep(0.0, r * 0.16, d);
+    lit = pow(1.0 - clamp(d / r, 0.0, 1.0), 2.2) * dirB * br;
+    spill = pow(1.0 - clamp(d / (r * 1.9), 0.0, 1.0), 3.0);
   }
-  // Reveal the water that is already there rather than painting white over it.
-  col *= 1.0 + glow * LAMP_LIFT;
+  // REVEAL the water that is already there rather than painting white over it.
+  col *= 1.0 + lit * LAMP_LIFT * W_LIFT;
 
   // ---- layer 9: marine snow, three parallax layers, brighter in the beam ----
   float snow =
       snowLayer(uv, aspect, t, SNOW_DENSITY * 2.1, 0.016, 0.09, vec2(0.0, 0.0))   * W_SNOWFAR
     + snowLayer(uv, aspect, t, SNOW_DENSITY * 1.3, 0.032, 0.13, vec2(37.0, 91.0)) * W_SNOWMID
     + snowLayer(uv, aspect, t, SNOW_DENSITY * 0.7, 0.061, 0.20, vec2(83.0, 11.0)) * W_SNOWNEAR;
-  col += FLAKE * snow * SNOW_STRENGTH * (1.0 + glow * LAMP_ON_SNOW);
+  col += FLAKE * snow * SNOW_STRENGTH * (1.0 + lit * LAMP_ON_SNOW);
 
-  // A modest cool add so the beam still exists in near-black water, where there
-  // is nothing for the multiply above to reveal.
-  col += (top * 0.35 + vec3(0.04, 0.09, 0.11)) * glow;
+  // ---- the lamp's own light (EMIT). Weighted separately from REVEAL: at 50m
+  // both are low, so the lamp is a toy against the sun rather than a white
+  // blob on a bright ground. In near-black water this is what makes the beam
+  // exist at all, since there is nothing there for REVEAL to multiply. ----
+  col += mix(LAMP_EMPTY, LAMP_FULL, uFuel) * lit * 0.55 * W_EMIT;
+  col += vec3(1.00, 0.97, 0.90) * core * br * 0.85 * W_EMIT;
+  col += SPILL * spill * dirB * br * 0.22 * (0.40 + 0.60 * uFuel) * W_EMIT;
 
   // ---- brownout vignette: the dark closing in ----
   col *= 1.0 - 0.80 * uHush * smoothstep(0.12, 0.85, length((vUv - 0.5) * vec2(aspect, 1.0)));
@@ -251,6 +266,7 @@ export function makeMedium(glx) {
     lamp: gl.getUniformLocation(prog, 'uLamp'),
     resolution: gl.getUniformLocation(prog, 'uResolution'),
     hush: gl.getUniformLocation(prog, 'uHush'),
+    fuel: gl.getUniformLocation(prog, 'uFuel'),
     water: gl.getUniformLocation(prog, 'uWater'),
   };
 
@@ -266,6 +282,7 @@ export function makeMedium(glx) {
     resolution = null,
     water = null,
     hush = 0,
+    fuel = 1,
   } = {}) {
     gl.useProgram(prog);
     gl.bindVertexArray(quad);
@@ -277,6 +294,7 @@ export function makeMedium(glx) {
     if (lamp) gl.uniform3f(u.lamp, lamp.x, lamp.y, lamp.radius);
     if (resolution) gl.uniform2f(u.resolution, resolution[0], resolution[1]);
     gl.uniform1f(u.hush, hush);
+    gl.uniform1f(u.fuel, fuel);
     if (water) {
       for (let i = 0; i < WATER_KEYS.length; i++) waterBuf[i] = water[WATER_KEYS[i]];
       gl.uniform1fv(u.water, waterBuf);

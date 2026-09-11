@@ -18,6 +18,7 @@ import { makeSightings } from './sightings.js';
 import { makeAudio } from './audio.js';
 import { makeTilt, tiltPreferred } from './tilt.js';
 import { makeHud } from './hud.js';
+import { litAt, ambientFor } from './light.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 84;         // sprite edge in CSS px (scaled by DPR at draw time).
@@ -35,7 +36,6 @@ const PICKUP_RADIUS_M = 3.4;   // metres — the diver's catch reach for plankto
                                 // motes fall within reach by chance). Intentional — the phone is
                                 // the target device and should be the forgiving one — but a trap
                                 // for whoever retunes either number later without the other.
-const GLOW_SCALE = 2.4;        // lamp sprite edge as a multiple of the lamp's pixel radius
 const BROWNOUT_SECONDS = 2;    // how long the rescue drift lasts
 const BROWNOUT_RISE_M = 50;    // how far the rescue lifts the diver back toward the light
 const BEST_KEY = 'deep-glow:best';
@@ -347,7 +347,6 @@ if (!glx) {
     const sprite = { id: 'diver', x: 0, y: 0, size: DIVER_SIZE, r: 1, g: 1, b: 1, alpha: 1, rot: 0 };
     const mote = { id: 'plankton-a', x: 0, y: 0, size: PLANKTON_SIZE, r: 1, g: 0.92, b: 0.72, alpha: 0.9, rot: 0 };
     const critter = { id: 'bubble-fish', x: 0, y: 0, size: CREATURE_SIZE, r: 1, g: 1, b: 1, alpha: 0.95, rot: 0 };
-    const glow = { id: 'lamp-glow', x: 0, y: 0, size: 0, r: 1, g: 1, b: 1, alpha: 0.55, rot: 0 };
     const fieldCtx = { box: null, viewMetres: 0, cast: null, escalation: 1 };
 
     // Reused between render() and medium.draw() so no frame allocates.
@@ -364,7 +363,7 @@ if (!glx) {
 
       // A bumper contact shakes the whole scene for WOBBLE_SECONDS, decaying
       // linearly to nothing. centreX replaces width/2 everywhere below (diver,
-      // plankton, creatures, lamp glow) so every actor shakes together, not just
+      // plankton, creatures, the lamp) so every actor shakes together, not just
       // the diver sprite. Amplitude is damped by CALM under reduced motion —
       // still readable as "something happened", just gentler.
       const shakeK = wobbleT > 0 ? wobbleT / WOBBLE_SECONDS : 0;
@@ -392,6 +391,7 @@ if (!glx) {
         resolution,
         water,
         hush: 0,
+        fuel: lampSnap.fuel,     // its own uniform: the shader can't derive it from a device-px radius
       });
 
       // World -> screen: x is centre-relative CSS px, so the device-pixel screen x
@@ -425,6 +425,12 @@ if (!glx) {
         critter.size = (CREATURE_SIZE
           + (c.rare ? CREATURE_RARE_BONUS : 0)
           + (c.kind === 'bumper' ? CREATURE_BUMPER_BONUS : 0)) * dpr;
+        // Lit by the lamp (light.js): faint out in the dark, blazing in the
+        // beam. lampUniform is already device px, the same space as critter.x/y.
+        const lit = litAt(critter.x, critter.y, lampUniform, ambientFor(c.kind, water.ambient), water.emit);
+        critter.r = lit;
+        critter.g = lit;
+        critter.b = lit;
         batch.push(critter);
       }
 
@@ -433,20 +439,9 @@ if (!glx) {
       sprite.size = DIVER_SIZE * dpr;
       batch.push(sprite);
       batch.flush();
-
-      // The lamp pass: one large additive quad centred on the diver, its edge a
-      // multiple of the light radius so it pools past the actor glows, tinted by
-      // the current zone colour lifted toward a warm lamp-white. Drawn after the
-      // actors so it sits over them, in the same additive space.
-      glow.x = diverX;
-      glow.y = diverY;
-      glow.size = lampRadiusPx * GLOW_SCALE;
-      glow.r = 0.55 + 0.45 * (pal.a[0] + (pal.b[0] - pal.a[0]) * pal.mix);
-      glow.g = 0.52 + 0.45 * (pal.a[1] + (pal.b[1] - pal.a[1]) * pal.mix);
-      glow.b = 0.46 + 0.45 * (pal.a[2] + (pal.b[2] - pal.a[2]) * pal.mix);
-      batch.begin(width, height);
-      batch.push(glow);
-      batch.flush();
+      // No lamp sprite pass any more: the lamp is drawn by the water shader
+      // (medium.js), which lights the water and snow, while litAt() above
+      // lights the creatures. The old glow quad painted over the actors.
 
       // Cheap even while hidden (menu state): hud.update() only writes when a
       // rounded value actually changed.

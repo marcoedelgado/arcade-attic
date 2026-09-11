@@ -22,14 +22,13 @@ const COLS = ATLAS / CELL; // 8
 const MASK_SOLID = 40; // fully opaque out to here
 const MASK_ZERO = 56; // fully transparent from here to the border (8px clear margin)
 
-// Grid slots, in draw order. Row 0 is the diver + plankton + lamp glow from
-// earlier tasks; Task 9 appends one frame per creature id in depth.js's ZONES,
+// Grid slots, in draw order. Row 0 is the diver + plankton from earlier tasks; Task 9 appends one frame per creature id in depth.js's ZONES,
 // grouped by zone (5 zones x 4 creatures = 20 ids), row 1 onward. The
 // round-1 fix added the fifth id per zone — the non-rare bumper — after the
 // first pass left every zone with no obstacle at all (every rare is a
 // drifter, and the original roster had no non-rare bumper to fall back on).
 const LAYOUT = [
-  'diver', 'plankton-a', 'plankton-b', 'plankton-c', 'lamp-glow',
+  'diver', 'plankton-a', 'plankton-b', 'plankton-c',
   // Sunlit Shallows
   'bubble-fish', 'silver-dart', 'lazy-turtle', 'sunfish',
   // The Blue
@@ -98,8 +97,6 @@ function drawCell(id) {
     drawBlob(ctx, cx, cy, 15, [206, 232, 255]); // small, cool
   } else if (id === 'plankton-c') {
     drawBlob(ctx, cx, cy, 32, [255, 214, 168]); // largest, amber
-  } else if (id === 'lamp-glow') {
-    drawGlow(ctx, cx, cy); // the lamp's pool of light — scaled way up in-game
   } else if (id === 'bubble-fish') {
     drawBubbleFish(ctx, cx, cy);
   } else if (id === 'silver-dart') {
@@ -153,24 +150,6 @@ function drawCell(id) {
   ctx.fillRect(0, 0, CELL, CELL);
 
   return c;
-}
-
-// The lamp glow: a single very soft white disc, full white at the core and a
-// hard zero by MASK_ZERO. game.js pushes this one frame scaled to a multiple of
-// the lamp's pixel radius and tinted (vColor) by the current zone, so the light
-// pools into the water around the diver and shrinks as the fuel drains. White
-// here so the in-game tint is a straight multiply.
-function drawGlow(ctx, x, y) {
-  const r = MASK_ZERO;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.35, 'rgba(255,255,255,0.5)');
-  g.addColorStop(0.7, 'rgba(255,255,255,0.16)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 // A soft radial blob: bright core, transparent by `r`. rgb is 0-255.
