@@ -19,11 +19,15 @@ import { makeAudio } from './audio.js';
 import { makeTilt, tiltPreferred } from './tilt.js';
 import { makeHud } from './hud.js';
 import { litAt, ambientFor } from './light.js';
+import { CREATURES, F, frameId } from './creatures.js';
 
 const DIVER_SCREEN_Y = 0.42;   // the diver sits at this fraction of the canvas; the world scrolls past
 const DIVER_SIZE = 84;         // sprite edge in CSS px (scaled by DPR at draw time).
                                // 84, not 64: at 64 the fish was a smudge lost
                                // inside its own lamp glow.
+const DIVER_TINT = 1.35;       // flat colour multiplier: the diver sits at the lamp origin, so
+                               // litAt() would double-count and clip it (art direction §03)
+const FRAME_MS = 250;          // 4fps across creatures.js's F animation frames
 const PX_PER_METRE = 9;        // CSS px of vertical scroll per metre of depth
 const PLANKTON_SIZE = 22;      // mote sprite edge in CSS px
 const PLANKTON_DRIFT = 6;      // CSS px of lazy horizontal sway, keyed off each mote's phase
@@ -43,12 +47,12 @@ const TILT_MSG_SECONDS = 3;    // how long the "tilt isn't available" toast stay
 
 // Creatures (Task 9). Sizes/speeds are playtest-owned tunables, not pinned by
 // any test — the suite only requires the id/kind/rare/x/y/phase shape.
-const CREATURE_SIZE = 44;          // base sprite edge in CSS px — rare gets a bit bigger below.
-                                   // 44, not 34: ~4 are on screen at any moment
-                                   // (measured), but at 34 they were too small
-                                   // and dim to register as living things.
-const CREATURE_RARE_BONUS = 8;     // px added to a rare creature's on-screen size
-const CREATURE_BUMPER_BONUS = 10;  // px added to a bumper's on-screen size — large at a glance
+const CREATURE_SIZE = 60;          // base sprite edge in CSS px — rare gets a bit bigger below.
+                                   // 60, not 44: the art direction judged legibility with
+                                   // the 128px cell drawn at 60px — draw it smaller and
+                                   // the kids see less than the sheet did.
+const CREATURE_RARE_BONUS = 11;    // px added to a rare creature's on-screen size (8 x 60/44)
+const CREATURE_BUMPER_BONUS = 14;  // px added to a bumper's on-screen size — large at a glance
 const BUMP_RADIUS_M = 4.2;         // metres — a bumper is large, so its contact reach is generous
 const BUMP_COOLDOWN_SECONDS = 0.5; // after a bump, no further bump is scored for this long — a
                                     // lingering overlap costs fuel once, not every frame
@@ -59,6 +63,12 @@ const CAPTION_SECONDS = 2.5;       // how long a sighting caption stays on scree
 // Per-kind cosmetic sway at render time — same idea as PLANKTON_DRIFT, applied
 // to creatures instead. Amplitude in CSS px, period in ms. Purely visual: it
 // never touches the creature's real x, which is what bump/sighted compare.
+// Every animated frame id ("<id>/<f>"), built once — the render loop must
+// not build strings.
+const FRAME_IDS = {};
+for (const { id } of [{ id: 'diver' }, ...CREATURES]) {
+  FRAME_IDS[id] = Array.from({ length: F }, (_, f) => frameId(id, f));
+}
 const CREATURE_SWAY = {
   drifter: { amp: 10, period: 2600 },
   shy: { amp: 4, period: 900 },
@@ -155,7 +165,7 @@ if (!glx) {
     let brownoutT = 0;          // seconds elapsed in the current brownout drift
     let best = readBest();
 
-    // creature id -> a human caption/label ("giant-octopus" -> "Giant Octopus").
+    // creature id -> a human caption/label ("ember-octopus" -> "Ember Octopus").
     // Every id sighted() ever returns, and every id in RARE_IDS below, is a rare
     // id from depth.js's ZONES — already lowercase-hyphenated words, so no
     // lookup table is needed. Used by both the caption (during a dive) and the
@@ -344,9 +354,9 @@ if (!glx) {
     // `mote` is reused across the WHOLE plankton loop, `critter` across the whole
     // creature loop — many pushes per frame, one object each. `fieldCtx` is
     // filled once per frame, never per mote/creature.
-    const sprite = { id: 'diver', x: 0, y: 0, size: DIVER_SIZE, r: 1, g: 1, b: 1, alpha: 1, rot: 0 };
+    const sprite = { id: FRAME_IDS.diver[0], x: 0, y: 0, size: DIVER_SIZE, r: DIVER_TINT, g: DIVER_TINT, b: DIVER_TINT, alpha: 1, rot: 0 };
     const mote = { id: 'plankton-a', x: 0, y: 0, size: PLANKTON_SIZE, r: 1, g: 0.92, b: 0.72, alpha: 0.9, rot: 0 };
-    const critter = { id: 'bubble-fish', x: 0, y: 0, size: CREATURE_SIZE, r: 1, g: 1, b: 1, alpha: 0.95, rot: 0 };
+    const critter = { id: FRAME_IDS[CREATURES[0].id][0], x: 0, y: 0, size: CREATURE_SIZE, r: 1, g: 1, b: 1, alpha: 0.95, rot: 0 };
     const fieldCtx = { box: null, viewMetres: 0, cast: null, escalation: 1 };
 
     // Reused between render() and medium.draw() so no frame allocates.
@@ -404,6 +414,7 @@ if (!glx) {
       // PX_PER_METRE below the fixed DIVER_SCREEN_Y band. dpr is applied here, at
       // the draw call, exactly as for the diver — the field works in CSS px.
       const now = performance.now();
+      const tick = Math.floor(now / FRAME_MS);   // which animation frame, shared by every actor
       for (const p of field.plankton) {
         mote.id = p.kind;
         mote.x = centreX + (p.x + Math.sin(now / 1000 + p.phase) * PLANKTON_DRIFT) * dpr;
@@ -418,7 +429,8 @@ if (!glx) {
       // moved in updateCreatureInteractions(); this is purely the on-screen wobble
       // layered on top, same as plankton's.
       for (const c of field.creatures) {
-        critter.id = c.id;
+        // Offset by the creature's own phase so a screenful doesn't flap in lockstep.
+        critter.id = FRAME_IDS[c.id][(tick + Math.floor(c.phase * 10)) % F];
         const sway = CREATURE_SWAY[c.kind] || CREATURE_SWAY.drifter;
         critter.x = centreX + (c.x + Math.sin(now / sway.period + c.phase) * sway.amp) * dpr;
         critter.y = height * DIVER_SCREEN_Y + (c.y - depthM) * PX_PER_METRE * dpr;
@@ -434,6 +446,7 @@ if (!glx) {
         batch.push(critter);
       }
 
+      sprite.id = FRAME_IDS.diver[tick % F];
       sprite.x = diverX;
       sprite.y = diverY;
       sprite.size = DIVER_SIZE * dpr;
