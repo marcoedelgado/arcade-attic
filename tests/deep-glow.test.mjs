@@ -8,6 +8,7 @@ import { takePlankton, bumped, sighted } from '../games/deep-glow/collect.js';
 import { makeSightings } from '../games/deep-glow/sightings.js';
 import { litAt, ambientFor, LAMP_ON_SPRITE, LAMP_REACH, BUMPER_FLOOR } from '../games/deep-glow/light.js';
 import { CREATURES, DIVER_OPS, F, MASK_ZERO, opsAt, extent, frameId } from '../games/deep-glow/creatures.js';
+import { brownoutAt, BROWNOUT_SECONDS, BEATS } from '../games/deep-glow/brownout.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -475,4 +476,55 @@ test('creatures: depth.js casts match the creature table exactly', () => {
     const want = CREATURES.filter((c) => c.zone === z).map(({ id, kind, rare }) => ({ id, kind, rare }));
     assert.deepEqual(ZONES[z].cast, want, `zone ${z} (${ZONES[z].name})`);
   }
+});
+
+test('brownout: starts where the lamp left off, calm and unrisen', () => {
+  const s = brownoutAt(0, 60);
+  assert.equal(s.radius, 60);
+  assert.equal(s.calm, 1);
+  assert.equal(s.rise, 0);
+});
+
+test('brownout: continuous across every beat boundary', () => {
+  for (const B of [BEATS.gutterEnd, BEATS.hushEnd, BEATS.liftEnd]) {
+    const a = brownoutAt(B - 1e-7, 60), b = brownoutAt(B + 1e-7, 60);
+    for (const k of ['radius', 'fuel', 'calm', 'rise']) {
+      assert.ok(Math.abs(a[k] - b[k]) < 1e-3, `${k} jumped at ${B}s: ${a[k]} -> ${b[k]}`);
+    }
+  }
+});
+
+test('brownout: the rise only goes up, from 0 to 1', () => {
+  let prev = 0;
+  for (let t = 0; t <= BROWNOUT_SECONDS; t += 0.01) {
+    const { rise } = brownoutAt(t, 60);
+    assert.ok(rise >= prev - 1e-12 && rise <= 1, `rise ${rise} at ${t}s`);
+    prev = rise;
+  }
+  assert.equal(brownoutAt(BROWNOUT_SECONDS, 60).rise, 1);
+});
+
+test('brownout: it goes dark and quiet in the middle — a coal, not a lamp', () => {
+  const mid = brownoutAt((BEATS.hushEnd + BEATS.liftEnd) / 2, 60);
+  assert.ok(mid.radius < 60, `radius ${mid.radius} should be below the lamp's own floor`);
+  assert.equal(mid.fuel, 0);
+  assert.ok(brownoutAt(BEATS.hushEnd, 60).calm <= 0.15, 'the hush should nearly stop the water');
+});
+
+test('brownout: the relight overshoots before settling', () => {
+  let peak = 0;
+  for (let t = BEATS.liftEnd; t <= BROWNOUT_SECONDS; t += 0.005) peak = Math.max(peak, brownoutAt(t, 60).radius);
+  assert.ok(peak > brownoutAt(BROWNOUT_SECONDS, 60).radius + 2, `peak ${peak} never overshot`);
+});
+
+test('brownout: ends exactly where lamp.relight() puts the lamp', () => {
+  // Pins the coupling to lamp.js: the timeline's last frame must hand over to
+  // the real lamp with no visible jump in radius or fuel.
+  const l = makeLamp();
+  l.relight();
+  const end = brownoutAt(BROWNOUT_SECONDS, 60);
+  assert.ok(Math.abs(end.radius - l.radius) < 1e-6, `timeline ends at ${end.radius}, lamp relights at ${l.radius}`);
+  assert.ok(Math.abs(end.fuel - l.fuel) < 1e-6);
+  assert.equal(end.calm, 1);
+  assert.deepEqual(brownoutAt(BROWNOUT_SECONDS + 5, 60), end);
 });
