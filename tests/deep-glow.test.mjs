@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt } from '../games/deep-glow/depth.js';
+import { ZONES, ZONE_METRES, zoneAt, paletteAt, escalationAt, castAt, WATER_KEYS, waterAt } from '../games/deep-glow/depth.js';
 import { makeDiver } from '../games/deep-glow/diver.js';
 import { makeField } from '../games/deep-glow/field.js';
 import { makeLamp } from '../games/deep-glow/lamp.js';
@@ -108,6 +108,53 @@ test('depth: castAt returns the roster for the zone', () => {
     assert.deepEqual(cast, ZONES[index].cast,
       `castAt(${m}m) does not match zoneAt(${m}m).index`);
   }
+});
+
+const SHADER_KEYS = ['floor', 'ceiling', 'shafts', 'caustics', 'curtains', 'snowFar', 'snowMid',
+  'snowNear', 'glimmers', 'ember', 'shimmer', 'lift', 'emit'];
+const VISIBLE_LAYERS = ['ceiling', 'shafts', 'caustics', 'curtains', 'snowFar', 'snowMid',
+  'snowNear', 'glimmers', 'ember', 'shimmer'];
+
+test('depth: WATER_KEYS is the 13 shader layers, and every zone defines them plus calm', () => {
+  assert.deepEqual(WATER_KEYS, SHADER_KEYS);
+  for (const z of ZONES) {
+    for (const k of [...WATER_KEYS, 'calm']) {
+      assert.equal(typeof z.water[k], 'number', `${z.name} is missing water.${k}`);
+    }
+  }
+});
+
+test('depth: waterAt holds each zone\'s own recipe before the handover starts', () => {
+  for (let i = 0; i < ZONES.length; i++) {
+    const w = waterAt(i * ZONE_METRES + ZONE_METRES * 0.35);
+    for (const k of Object.keys(ZONES[i].water)) {
+      assert.ok(Math.abs(w[k] - ZONES[i].water[k]) < 1e-9, `${ZONES[i].name} ${k}: ${w[k]}`);
+    }
+  }
+});
+
+test('depth: waterAt is continuous at every boundary including the loop seams', () => {
+  for (const B of [200, 400, 600, 800, 1000, 1200, 1400, 1600, 2200]) {
+    const a = waterAt(B - 0.01), b = waterAt(B + 0.01);
+    for (const k of Object.keys(a)) {
+      assert.ok(Math.abs(a[k] - b[k]) < 0.02, `at ${B}m ${k} jumped ${a[k]} -> ${b[k]}`);
+    }
+  }
+});
+
+test('depth: at least four visible water layers are alive at every depth', () => {
+  // The art direction's core rule. The old shader let every layer decay toward
+  // zero, so the deep converged on gradient + dots + blob.
+  for (let m = 0; m <= 3000; m += 5) {
+    const w = waterAt(m);
+    const alive = VISIBLE_LAYERS.filter((k) => w[k] >= 0.1);
+    assert.ok(alive.length >= 4, `only ${alive.length} layers alive at ${m}m: ${alive}`);
+  }
+});
+
+test('depth: waterAt fills a caller-supplied object instead of allocating', () => {
+  const out = {};
+  assert.equal(waterAt(500, out), out);
 });
 
 const vp = { width: 480, height: 800 };
