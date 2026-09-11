@@ -192,25 +192,96 @@ if (!glx) {
       }
     }
 
-    // One badge per zone's rare creature (depth.js: exactly one per zone, in
-    // zone order) — lit if sightings has ever marked it, a dim silhouette
-    // otherwise. Built once; sightings only grows during a dive and there is
-    // no path back to the menu this task, so there is nothing to re-sync.
+    // Creature pictures for the menu and the sighting caption are copied
+    // straight out of the sprite atlas, so a child sees exactly the creature
+    // they meet in the water — no second copy of the art, no image files.
+    // PIC_CROP trims the atlas cell's empty margin (every rare and bumper
+    // paints within ~41px of centre; creatures.js's extent test bounds it)
+    // so the creature fills its badge.
+    const PIC_CROP = 88;
+    const dprPic = Math.min(2, window.devicePixelRatio || 1);
+    function makePic(cssPx, className) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = Math.round(cssPx * dprPic);
+      cv.className = className;
+      cv.setAttribute('aria-hidden', 'true');   // the name is the accessible label
+      return cv;
+    }
+    function paintPic(cv, id, f) {
+      const fr = atlas.frames[FRAME_IDS[id][f]];
+      const inset = (fr.w - PIC_CROP) / 2;
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(
+        atlas.canvas,
+        fr.u0 * atlas.canvas.width + inset, fr.v0 * atlas.canvas.height + inset, PIC_CROP, PIC_CROP,
+        0, 0, cv.width, cv.height,
+      );
+    }
+
+    // The menu's field guide. Row 1: one badge per zone's rare creature
+    // (depth.js: exactly one per zone, in zone order) — a flat grey "who's
+    // that?" silhouette of its real shape until sightings has marked it, then
+    // lit, named and gently animated. Row 2: each zone's bumper, always shown
+    // in colour under "Watch out!", so a five-year-old learns what costs lamp
+    // fuel before they dive. Built once: sightings only grows during a dive and
+    // there is no path back to the menu, so there is nothing to re-sync.
     const RARE_IDS = ZONES.map((z) => z.cast.find((c) => c.rare).id);
+    const BUMPER_IDS = ZONES.map((z) => z.cast.find((c) => c.kind === 'bumper').id);
+    const menuPics = [];   // [canvas, id] for the lit badges, animated while the menu is up
+
     if (badgesEl) {
       for (const id of RARE_IDS) {
-        const b = document.createElement('span');
-        b.className = 'dg-badge';
-        b.setAttribute('role', 'listitem');
-        b.textContent = '🐠';
         const seen = sightings.has(id);
-        b.classList.toggle('lit', seen);
-        const label = seen ? creatureName(id) : 'Not yet spotted';
+        const name = creatureName(id);
+        const b = document.createElement('div');
+        b.className = seen ? 'dg-badge lit' : 'dg-badge';
+        b.setAttribute('role', 'listitem');
+        const label = seen ? name : 'Not yet spotted';
         b.title = label;
         b.setAttribute('aria-label', label);
+        const disc = document.createElement('span');
+        disc.className = 'dg-badge-disc';
+        const pic = makePic(52, 'dg-pic');
+        paintPic(pic, id, 0);
+        disc.appendChild(pic);
+        const tag = document.createElement('span');
+        tag.className = 'dg-badge-name';
+        tag.setAttribute('aria-hidden', 'true');
+        tag.textContent = seen ? name : '?';
+        b.append(disc, tag);
         badgesEl.appendChild(b);
+        if (seen) menuPics.push([pic, id]);
       }
     }
+
+    const bumpersEl = document.getElementById('dg-bumpers');
+    if (bumpersEl) {
+      for (const id of BUMPER_IDS) {
+        const b = document.createElement('div');
+        b.className = 'dg-bumper';
+        b.setAttribute('role', 'listitem');
+        const name = creatureName(id);
+        b.title = name;
+        b.setAttribute('aria-label', name);
+        const pic = makePic(42, 'dg-pic');
+        paintPic(pic, id, 0);
+        b.appendChild(pic);
+        bumpersEl.appendChild(b);
+        menuPics.push([pic, id]);
+      }
+    }
+
+    // Lit badges and bumpers breathe through their three frames, same 4fps as
+    // in the water. Stopped for good when the dive begins (the menu never
+    // comes back), and never started under reduced motion.
+    let menuTick = 0;
+    const menuAnim = !reducedMotion && menuPics.length > 0
+      ? setInterval(() => {
+        menuTick = (menuTick + 1) % F;
+        for (const [pic, id] of menuPics) paintPic(pic, id, menuTick);
+      }, FRAME_MS)
+      : null;
 
     // Menu -> diving is deferred by one requestAnimationFrame, same fix as
     // pocket-pairs commit 5cb0131: a big synchronous DOM change (hiding the
@@ -220,6 +291,7 @@ if (!glx) {
       if (state !== STATE.MENU) return;
       audio.unlock();   // the tap itself is the user gesture that may build the context
       requestAnimationFrame(() => {
+        if (menuAnim) clearInterval(menuAnim);
         if (menuEl) menuEl.hidden = true;
         hud.show();
         audio.resetMelody();   // each dive opens the pentatonic scale from its root note
@@ -292,12 +364,32 @@ if (!glx) {
     // that's here, not in collect.js.
     const bumperScratch = [];
 
+    // The sighting caption: the creature's picture plus "You found <name>!",
+    // popping in so the reward lands the moment it happens (its badge only
+    // lights on the next visit to the menu). Children built once; only the
+    // picture and text change per sighting.
+    const captionPic = makePic(30, 'dg-caption-pic');
+    const captionText = document.createElement('span');
+    captionText.className = 'dg-caption-text';
+    if (captionEl) captionEl.append(captionPic, captionText);
+    const CAPTION_POP = [
+      { transform: 'translateX(-50%) scale(0.6)', opacity: 0 },
+      { transform: 'translateX(-50%) scale(1.08)', opacity: 1, offset: 0.65 },
+      { transform: 'translateX(-50%) scale(1)', opacity: 1 },
+    ];
+
     function showCaption(id) {
       captionId = id;
       captionT = CAPTION_SECONDS;
       if (captionEl) {
-        captionEl.textContent = creatureName(id);
+        paintPic(captionPic, id, 0);
+        captionText.textContent = `You found ${creatureName(id)}!`;
         captionEl.hidden = false;
+        // Web Animations, not a CSS class toggle: restarting a CSS animation
+        // needs a forced reflow. Skipped under reduced motion — it just appears.
+        if (!reducedMotion && typeof captionEl.animate === 'function') {
+          captionEl.animate(CAPTION_POP, { duration: 380, easing: 'ease-out' });
+        }
       }
     }
 

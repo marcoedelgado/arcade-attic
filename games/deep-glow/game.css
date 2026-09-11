@@ -123,34 +123,78 @@ body { overscroll-behavior: contain; }
   padding: 14px 34px;
 }
 
-/* Sighting badges — lit (a creature the player has actually met) vs a dim
-   silhouette (not yet). Same glyph either way; only the filter/opacity
-   differ, so nothing about an unseen creature is spoiled beyond "you'll
-   know it when you see it". */
-.dg-badges {
+/* The field guide: two rows of creature pictures, each a <canvas> copied
+   from the sprite atlas by game.js. The discs are near-black so the additive
+   art glows the way it does in the water. */
+.dg-guide-label {
+  margin: 4px 0 -6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.dg-guide-warn {
+  color: #ff9a7a;
+}
+.dg-badges,
+.dg-bumpers {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  max-width: 300px;
+  max-width: 320px;
 }
+.dg-pic {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Rare badges — lit (met at least once) vs a flat grey silhouette of the
+   creature's real shape (not yet): enough to know what to look for, not
+   enough to spoil the colour. */
 .dg-badge {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 2px solid var(--edge);
-  font-size: 18px;
-  filter: grayscale(1) brightness(0.45);
-  opacity: 0.55;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
 }
-.dg-badge.lit {
-  filter: none;
-  opacity: 1;
+.dg-badge-disc {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #060a14;
+  border: 2px solid var(--edge);
+}
+.dg-badge:not(.lit) .dg-pic {
+  filter: brightness(0) invert(0.42);
+  opacity: 0.75;
+}
+.dg-badge.lit .dg-badge-disc {
   border-color: var(--neon);
-  box-shadow: 0 0 8px rgba(255, 211, 77, 0.5);
+  box-shadow: 0 0 10px rgba(255, 211, 77, 0.55);
+}
+.dg-badge-name {
+  font-size: 0.6rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.dg-badge:not(.lit) .dg-badge-name {
+  color: var(--ink-dim);
+}
+
+/* Bumpers — always in colour (this row teaches, it isn't a collection), in
+   a dashed warm ring so they read as "careful" rather than "trophy". */
+.dg-bumper {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #060a14;
+  border: 2px dashed rgba(255, 140, 110, 0.6);
 }
 
 /* In-dive HUD — depth, lamp fuel, best. DOM text over the canvas (crisper,
@@ -210,32 +254,44 @@ body { overscroll-behavior: contain; }
    UA stylesheet's `[hidden] { display: none }`, so `display: grid` above leaves
    this opaque, inset:0 panel painted over the whole canvas forever — the HUD
    still updates on top of it, which makes it look like a render bug rather than
-   a stacking one. .dg-menu and .dg-hud carry the same guard; caption and
-   tilt-msg set no display of their own, but are guarded here too so that
-   adding one later can't silently resurrect this.
+   a stacking one. .dg-menu and .dg-hud carry the same guard. The caption
+   NEEDS this one (it is display:flex, for its picture + text); tilt-msg sets
+   no display of its own but is guarded so adding one later can't resurrect this.
    pocket-pairs hit exactly this in 4771ff2. */
 .dg-fallback[hidden],
 .dg-caption[hidden],
 .dg-tilt-msg[hidden] { display: none; }
 
-/* A short caption naming a rare creature just sighted — a small pill anchored
-   to the bottom of the stage, never blocking the drag/tap that steers it. */
+/* A short caption for a rare creature just sighted — its picture plus "You
+   found <name>!" in a pill anchored to the bottom of the stage, never
+   blocking the drag/tap that steers it. display:flex is safe here only
+   because .dg-caption[hidden] is guarded above. */
 .dg-caption {
   position: absolute;
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
-  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 4px 6px;
   border-radius: 999px;
-  background: rgba(6, 12, 24, 0.72);
+  background: rgba(6, 12, 24, 0.78);
+  border: 1px solid rgba(255, 211, 77, 0.45);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  text-align: center;
   white-space: nowrap;
+  pointer-events: none;
+}
+.dg-caption-pic {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.dg-caption-text {
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none;
 }
