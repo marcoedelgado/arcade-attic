@@ -20,15 +20,16 @@
 // offset consumed at render time.
 
 // TUNABLE — playtest-owned.
-// 9, not 14: PAIRED with diver.js's SINK_RATE (22, was 34). Lamp drain is per
-// SECOND while this gap is per METRE, so a slower descent means fewer motes per
-// second and a lamp that starves. 14 * (22/34) ~= 9 keeps motes-per-second — and
-// therefore the whole difficulty curve — where it was. Change one, change both.
-const PLANKTON_EVERY_METRES = 9;  // at escalation 1, one mote per 9 m of descent.
-                                  // The per-metre spawn rate is divided by
-                                  // `escalation`, i.e. the gap is multiplied by it,
-                                  // so the deep laps (escalation → 2.5) drift far
-                                  // fewer motes past you than the first lap does.
+// 4.5: PAIRED with diver.js's SINK_RATE (11; was 22 with a gap of 9, and 34
+// with 14). Lamp drain is per SECOND while this gap is per METRE, so a slower
+// descent means fewer motes per second and a lamp that starves. Halving the
+// gap with the sink rate keeps motes-per-second — and therefore the fuel
+// balance — where it was. Change one, change both.
+const PLANKTON_EVERY_METRES = 4.5;  // at escalation 1, one mote per 4.5 m of descent.
+                                    // The per-metre spawn rate is divided by
+                                    // `escalation`, i.e. the gap is multiplied by it,
+                                    // so the deep laps (escalation → 2.5) drift far
+                                    // fewer motes past you than the first lap does.
 const CREATURE_EVERY_METRES = 70; // creatures are the reward, not the wallpaper —
                                   // far sparser than plankton. Same escalation
                                   // stretch as plankton.
