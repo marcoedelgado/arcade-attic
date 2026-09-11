@@ -6,6 +6,7 @@ import { makeField } from '../games/deep-glow/field.js';
 import { makeLamp } from '../games/deep-glow/lamp.js';
 import { takePlankton, bumped, sighted } from '../games/deep-glow/collect.js';
 import { makeSightings } from '../games/deep-glow/sightings.js';
+import { litAt, ambientFor, LAMP_ON_SPRITE, LAMP_REACH, BUMPER_FLOOR } from '../games/deep-glow/light.js';
 
 test('depth: zone boundaries are exact', () => {
   assert.equal(zoneAt(0).index, 0);
@@ -375,4 +376,48 @@ test('sightings: a throwing storage never crashes the game', () => {
     a.mark('anything');
     assert.equal(a.has('anything'), true, 'should still work in memory for this session');
   });
+});
+
+const LAMP = { x: 100, y: 100, radius: 200 };
+
+test('light: at the lamp a sprite gets ambient plus the full lamp, scaled by emit', () => {
+  assert.ok(Math.abs(litAt(100, 100, LAMP, 0.2, 1) - (0.2 + LAMP_ON_SPRITE)) < 1e-9);
+  assert.ok(Math.abs(litAt(100, 100, LAMP, 0.2, 0.3) - (0.2 + LAMP_ON_SPRITE * 0.3)) < 1e-9);
+});
+
+test('light: beyond the lamp\'s reach a sprite gets exactly the ambient', () => {
+  assert.equal(litAt(100 + 200 * LAMP_REACH + 1, 100, LAMP, 0.35, 1), 0.35);
+  assert.equal(litAt(100, -2000, LAMP, 0.2, 1), 0.2);
+});
+
+test('light: the beam is stronger below the fish than above it', () => {
+  const below = litAt(100, 180, LAMP, 0.2, 1);
+  const above = litAt(100, 20, LAMP, 0.2, 1);
+  assert.ok(below > above, `below ${below} should beat above ${above} — you always sink`);
+});
+
+test('light: brightness never rises with distance along a ray', () => {
+  let prev = Infinity;
+  for (let d = 0; d <= 300; d += 5) {
+    const v = litAt(100 + d, 100, LAMP, 0.2, 1);
+    assert.ok(v <= prev + 1e-12, `rose at ${d}px`);
+    prev = v;
+  }
+});
+
+test('light: a zero-radius lamp lights nothing and never produces NaN', () => {
+  assert.equal(litAt(100, 100, { x: 100, y: 100, radius: 0 }, 0.2, 1), 0.2);
+});
+
+test('light: bumpers never drop below the floor, and the floor never dims a bright zone', () => {
+  assert.equal(ambientFor('bumper', 0.2), BUMPER_FLOOR);
+  assert.equal(ambientFor('bumper', 1.0), 1.0);
+  assert.equal(ambientFor('shy', 0.2), 0.2);
+  assert.equal(ambientFor('drifter', 0.6), 0.6);
+});
+
+test('depth: every zone has an ambient light level in (0, 1]', () => {
+  for (const z of ZONES) {
+    assert.ok(z.water.ambient > 0 && z.water.ambient <= 1, `${z.name} ambient ${z.water.ambient}`);
+  }
 });

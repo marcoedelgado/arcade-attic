@@ -22,6 +22,9 @@ const LOOP_START_ZONE = 2;
 // the Trench's light comes from below). waterAt() blends it between zones with
 // the same hold-then-handover as the palette. `calm` is the zone's motion speed
 // — game.js feeds it into the RATE of the shader clock, never the shader.
+// `ambient` is how visible a creature is outside the lamp (light.js) —
+// sunlight in the shallows, nothing at Midnight, ember-glow in the Trench.
+// Ours, not the export's flat 0.20; playtest-owned.
 export const ZONES = [
   {
     id: 'sunlit-shallows',
@@ -30,7 +33,7 @@ export const ZONES = [
     colour: [0.09, 0.77, 0.70],
     water: { floor: 0.22, ceiling: 0.90, shafts: 1.00, caustics: 1.00, curtains: 0.10,
       snowFar: 0.40, snowMid: 0.55, snowNear: 0.45, glimmers: 0.00, ember: 0.00, shimmer: 0.00,
-      lift: 0.25, emit: 0.30, calm: 1.00 },
+      lift: 0.25, emit: 0.30, calm: 1.00, ambient: 1.00 },
     cast: [
       { id: 'bubble-fish', kind: 'drifter', rare: false },
       { id: 'silver-dart', kind: 'shy', rare: false },
@@ -45,7 +48,7 @@ export const ZONES = [
     colour: [0.04, 0.34, 0.76],
     water: { floor: 0.20, ceiling: 0.55, shafts: 0.32, caustics: 0.45, curtains: 0.30,
       snowFar: 0.55, snowMid: 0.70, snowNear: 0.60, glimmers: 0.18, ember: 0.00, shimmer: 0.00,
-      lift: 0.45, emit: 0.50, calm: 0.70 },
+      lift: 0.45, emit: 0.50, calm: 0.70, ambient: 0.60 },
     cast: [
       { id: 'blue-dancer', kind: 'drifter', rare: false },
       { id: 'phantom-squid', kind: 'shy', rare: false },
@@ -60,7 +63,7 @@ export const ZONES = [
     colour: [0.16, 0.12, 0.48],
     water: { floor: 0.26, ceiling: 0.22, shafts: 0.08, caustics: 0.18, curtains: 1.00,
       snowFar: 0.75, snowMid: 0.95, snowNear: 0.80, glimmers: 0.55, ember: 0.00, shimmer: 0.00,
-      lift: 0.75, emit: 0.80, calm: 0.55 },
+      lift: 0.75, emit: 0.80, calm: 0.55, ambient: 0.35 },
     cast: [
       { id: 'lantern-jelly', kind: 'drifter', rare: false },
       { id: 'shadow-fish', kind: 'shy', rare: false },
@@ -75,7 +78,7 @@ export const ZONES = [
     colour: [0.04, 0.03, 0.09],
     water: { floor: 0.45, ceiling: 0.04, shafts: 0.00, caustics: 0.06, curtains: 0.70,
       snowFar: 0.70, snowMid: 0.95, snowNear: 0.90, glimmers: 1.00, ember: 0.12, shimmer: 0.08,
-      lift: 1.00, emit: 1.00, calm: 0.40 },
+      lift: 1.00, emit: 1.00, calm: 0.40, ambient: 0.20 },
     cast: [
       { id: 'glowing-squid', kind: 'drifter', rare: false },
       { id: 'depth-lurker', kind: 'shy', rare: false },
@@ -92,7 +95,7 @@ export const ZONES = [
     colour: [0.05, 0.012, 0.010],
     water: { floor: 1.35, ceiling: 0.00, shafts: 0.00, caustics: 0.12, curtains: 0.55,
       snowFar: 0.60, snowMid: 0.80, snowNear: 0.85, glimmers: 0.40, ember: 1.00, shimmer: 0.55,
-      lift: 0.85, emit: 0.90, calm: 0.85 },
+      lift: 0.85, emit: 0.90, calm: 0.85, ambient: 0.30 },
     cast: [
       { id: 'vent-worm', kind: 'drifter', rare: false },
       { id: 'black-smoker', kind: 'shy', rare: false },
