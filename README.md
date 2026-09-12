@@ -146,6 +146,55 @@ game look like a dead renderer. It is invisible to unit tests and easy to miss i
 review, because the markup says `hidden` and reads as correct. Grep your
 `game.css` for `display:` and check each one that JS ever toggles.
 
+### Games with a shader (so far only `deep-glow`)
+
+A GLSL typo is not like a JS typo: the shader fails to compile, the game falls
+back to its "needs a newer browser" panel, and every unit test still passes.
+Nothing in this repo's toolchain opens a browser, so nothing catches it.
+
+You can compile both shaders from the command line without a browser, and it
+takes about a minute to set up:
+
+1. Download Khronos's `glslang` release for your platform (the Windows zip gives
+   you `bin/glslang.exe`) and unzip it **outside the repo** — it is a checking
+   tool, never a dependency.
+2. Write a short script that calls your `makeMedium` / `makeBatch` with a stub
+   `glx` whose `program(vert, frag)` just records the two source strings, writes
+   each to a `.vert` / `.frag` file, and runs `glslang` over it. Capturing the
+   sources this way (rather than reading them out of the file) keeps working when
+   the shader is assembled at runtime, as `deep-glow/medium.js` does with its
+   generated `#define`s.
+
+It catches typos and type errors, not driver quirks — a phone GPU can still
+reject something desktop tooling accepts — so it narrows the gap, it doesn't
+close it. Keep every mood-setting constant in one `// ---- TUNING ----` block,
+as `deep-glow/medium.js` does, since none of it can be unit-tested and it will
+all need adjusting by eye later.
+
+### Bringing in a Claude Design export
+
+Several games here got their look from a Claude Design project (`waffle-wednesday`,
+`pocket-pairs`, `deep-glow`). What works:
+
+- **Treat the export as material, not a decision.** It doesn't know which of its
+  ideas are free here and which are impossible. Sort the ideas cheapest-first,
+  and reject anything needing an image file, a font file, or a game-over screen.
+- **Ask for a specification, not just a picture.** Concrete colours, named layers
+  with their strengths, shapes described as shapes. A beautiful export that can't
+  be turned into numbers can't be built here.
+- **Transcribe data tables with a script, not by hand.** `deep-glow`'s twenty
+  creatures came across as an op list generated straight from the export's own
+  source — 174 lines nobody had to retype or proofread.
+- **Read its code before copying it.** A design canvas is written to look right in
+  one browser tab, not to survive in a game loop. `deep-glow`'s import carried
+  five real bugs, each documented in the commit that avoided it: an animation clock
+  that jumped whenever speed changed, one value driving two unrelated effects,
+  game logic duplicated where no test could reach it, a value read in the wrong
+  pixel units, and coordinates going negative where a hash needed them positive.
+- **Keep the decisions in tested code.** Put the tables and rules in a pure module
+  and let the shader multiply what it's handed; then a design rule ("at least four
+  layers visible at every depth") becomes a test rather than a note.
+
 ## Design vocabulary (optional, for consistency)
 
 `assets/styles.css` defines CSS custom properties you can reuse so every game
