@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feathered Serpent — Arcade Attic</title>
+  <link rel="icon" href="../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <main class="aa-game">
+    <div class="aa-game-top">
+      <a class="aa-back" href="../../">← The Attic</a>
+      <h1 class="aa-game-title">Feathered Serpent</h1>
+    </div>
+
+    <div class="fs-stage-wrap">
+      <!-- Two stacked canvases, same size, no interop between them (spec §5).
+           #sky is the WebGL2 backdrop (2D gradient fallback if the shader fails
+           to compile). #stage is Canvas 2D: serpent, feathers, obstacles, HUD. -->
+      <canvas id="sky" aria-hidden="true"></canvas>
+      <canvas id="stage" tabindex="0"
+        aria-label="Feathered Serpent — drag to steer your serpent up toward the morning star"></canvas>
+
+      <div id="fs-menu" class="fs-menu">
+        <h2 class="fs-menu-title">Feathered Serpent</h2>
+        <!-- The menu art IS the score (spec §2): the serpent drawn at your best
+             plume stage. No number, no reading. -->
+        <canvas id="fs-best" class="fs-best" width="240" height="120"
+          aria-label="Your best serpent so far"></canvas>
+        <button id="fs-start" class="aa-btn fs-menu-start" type="button">Fly</button>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="game.js"></script>
+</body>
+</html>

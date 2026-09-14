@@ -1,0 +1,77 @@
+/* Feathered Serpent — stage container, the two stacked canvases, touch guards,
+   and the menu panel. Shared design tokens: ../../assets/styles.css */
+
+body { overscroll-behavior: contain; }
+
+.fs-stage-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 5;
+  max-height: 76vh;
+  margin: 0 auto;
+}
+
+/* Both canvases fill the wrap and sit exactly on top of each other. #sky paints
+   the backdrop, #stage the serpent. #stage must be transparent — it is composited
+   over the sky, never cleared to a colour. */
+#sky,
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: var(--radius);
+}
+
+#sky {
+  z-index: 0;
+  background: #0f0c1e;              /* until the first frame paints */
+}
+
+#stage {
+  z-index: 1;
+  background: transparent;
+  touch-action: none;               /* a drag must never pan/scroll the page */
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.aa-btn { touch-action: manipulation; }
+
+/* ---------- Menu ---------- */
+.fs-menu {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: rgba(15, 12, 30, 0.82);
+  text-align: center;
+}
+.fs-menu[hidden] { display: none; }
+
+.fs-menu-title {
+  font-family: var(--font-display);
+  font-size: clamp(0.7rem, 3.4vw, 1.1rem);
+  line-height: 1.6;
+  margin: 0;
+  color: var(--neon-green);
+  text-shadow: var(--shadow);
+}
+
+.fs-best {
+  width: min(240px, 70%);
+  height: auto;
+  display: block;
+}
+
+.fs-menu-start {
+  font-size: 1rem;
+  padding: 12px 28px;
+}
